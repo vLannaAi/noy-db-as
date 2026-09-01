@@ -63,28 +63,36 @@ const HUB_IMPORT_RE = /(?:from|import|require)\s*\(?\s*['"]@noy-db\/hub(\/[^'"]*
 function checkNoRuntimeStoreImport() {
   // Rule 2 — no-runtime-store-import (the `as-*` layer boundary).
   //
-  // NOT a copy of noy-db-to's `to-only` rule, which requires stores to import
-  // ONLY `@noy-db/hub/to`. That rule is false here in both directions: an
-  // `as-*` package binds `@noy-db/hub/as`, legitimately reads shared types
-  // from the root and `/introspection`, and — unlike a store — SEES PLAINTEXT
-  // BY DESIGN (ADR 0004: hub owns export/import, a format supplies
-  // encode/decode and its own id). Porting `to-only` verbatim fails 26 times
-  // on correct code.
+  // NOT noy-db-to's `to-only` rule, which requires a package to import ONLY
+  // `@noy-db/hub/to`. Ported verbatim it fails on correct code here, because a
+  // `as-*` package binds its own port and legitimately reads shared types
+  // from the root.
   //
-  // What IS invariant: a FORMAT encodes and decodes bytes; it never performs
-  // storage I/O. So a VALUE import of the store contract is a layer violation.
-  // A TYPE-only import is not — `as-aws-s3` takes `StoreCredentials` from
-  // `/to` to talk to S3, which erases at build and moves no data.
+  // What IS invariant: a format encodes and decodes bytes; it never performs storage I/O. So a VALUE import of the store
+  // contract is a layer violation, while a TYPE-only import is not — the types
+  // erase at build and move no data.
+  //
+  // ⚠️ Implemented by scanning BACKWARD from each module specifier to its own
+  // `import` keyword, NOT by one regex over the statement. A pattern like
+  // /import\s+(type\s+)?[^;]*?from '...'/ looks right and is wrong: `[^;]`
+  // matches NEWLINES, so it happily spans from an unrelated multi-line
+  // `import { a, b, c }` at the top of a file down to a `from` clause far
+  // below, reports the wrong statement, and misses the `type` keyword that is
+  // actually there. That produced a false positive on real code.
+  const SPEC = "from '@noy-db/hub/to'"
   for (const dir of listStoreDirs()) {
     const pj = readPkg(dir)
     walkTs(join(dir, 'src'), (file, code) => {
-      const re = /^[ \t]*import\s+(type\s+)?[^;]*?from\s+'@noy-db\/hub\/to'/gm
-      let m
-      while ((m = re.exec(code)) !== null) {
-        if (m[1]) continue // `import type` — erased at build
-        fail('no-runtime-store-import',
-          `${pj.name}: value-imports '@noy-db/hub/to' — a format encodes bytes and must not do storage I/O. ` +
-          `Use \`import type\` if you only need the contract's types.`, file)
+      let at = code.indexOf(SPEC)
+      while (at !== -1) {
+        const kw = code.lastIndexOf('import', at)
+        // The statement is type-only if `type` is the next token after `import`.
+        const isTypeOnly = kw !== -1 && /^import\s+type\b/.test(code.slice(kw, at))
+        if (!isTypeOnly)
+          fail('no-runtime-store-import',
+            `${pj.name}: value-imports '@noy-db/hub/to' — a format encodes and decodes bytes; it never performs storage I/O. ` +
+            `Use \`import type\` if you only need the contract's types.`, file)
+        at = code.indexOf(SPEC, at + 1)
       }
     })
   }

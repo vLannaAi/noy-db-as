@@ -17,9 +17,6 @@ importers:
       eslint:
         specifier: ^9.18.0
         version: 9.39.5
-      happy-dom:
-        specifier: ^18.0.0
-        version: 18.0.1
       semver:
         specifier: ^7.6.0
         version: 7.8.5
@@ -62,6 +59,9 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
+      happy-dom:
+        specifier: ^18.0.0
+        version: 18.0.1
 
   as-csv:
     devDependencies:
@@ -74,6 +74,9 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
+      happy-dom:
+        specifier: ^18.0.0
+        version: 18.0.1
 
   as-json:
     devDependencies:
@@ -86,6 +89,9 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
+      happy-dom:
+        specifier: ^18.0.0
+        version: 18.0.1
 
   as-ndjson:
     devDependencies:
@@ -98,6 +104,9 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
+      happy-dom:
+        specifier: ^18.0.0
+        version: 18.0.1
 
   as-noydb:
     devDependencies:
@@ -110,6 +119,9 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
+      happy-dom:
+        specifier: ^18.0.0
+        version: 18.0.1
 
   as-sql:
     devDependencies:
@@ -122,6 +134,9 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
+      happy-dom:
+        specifier: ^18.0.0
+        version: 18.0.1
 
   as-xlsx:
     dependencies:
@@ -144,6 +159,9 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
+      happy-dom:
+        specifier: ^18.0.0
+        version: 18.0.1
 
   as-xml:
     dependencies:
@@ -160,6 +178,9 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
+      happy-dom:
+        specifier: ^18.0.0
+        version: 18.0.1
 
   as-zip:
     devDependencies:
@@ -175,6 +196,9 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
+      happy-dom:
+        specifier: ^18.0.0
+        version: 18.0.1
 
 packages:
 

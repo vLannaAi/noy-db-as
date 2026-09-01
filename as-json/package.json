@@ -42,8 +42,9 @@
   },
   "devDependencies": {
     "@noy-db/hub": "0.7.0-pre.17",
+    "@noy-db/test-format-conformance": "0.7.0-pre.17",
     "@types/node": "^22.0.0",
-    "@noy-db/test-format-conformance": "0.7.0-pre.17"
+    "happy-dom": "^18.0.0"
   },
   "keywords": [
     "noy-db",

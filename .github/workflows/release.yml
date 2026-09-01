@@ -501,14 +501,24 @@ jobs:
           shopt -s nullglob
           PKG_FILES=(as-*/package.json)
           shopt -u nullglob
-          COUNT=${#PKG_FILES[@]}
+          #
+          # PRIVATE manifests are excluded. This list is consumed by
+          # noy-db-docs to update npm PINS, and a private package has no pin
+          # to update — naming one hands docs an instruction it cannot carry
+          # out. (Not for consistency with the other gates: most of them do
+          # NOT filter private, and correctly so — an architecture or
+          # peer-floor rule applies to a private package just the same.)
+          #
+          # ⚠️ COUNT is taken from the RESULT, not from the file list. Counting
+          # the glob first would let a private-only tree through with COUNT=1.
+          PACKAGES=$(for f in "${PKG_FILES[@]}"; do
+            node -e "const j = require('./$f'); if (!j.private && j.name && j.version) console.log(j.name + '@' + j.version)"
+          done | sort)
+          COUNT=$(printf '%s' "$PACKAGES" | grep -c . || true)
           if [ "$COUNT" -eq 0 ]; then
-            echo "::error::No as-* packages found — refusing to file an empty doc-sync issue."
+            echo "::error::No publishable as-* packages found — refusing to file an empty doc-sync issue."
             exit 1
           fi
-          PACKAGES=$(for f in "${PKG_FILES[@]}"; do
-            node -p "const j = require('./$f'); j.name + '@' + j.version"
-          done | sort)
 
           {
             echo "\`noy-db-as\` published **$TAG** to \`@$CHANNEL\`."
@@ -536,9 +546,28 @@ jobs:
           # The repo name is not decoration: two producers can carry the same tag.
           TITLE="doc-sync needed: noy-db-as $TAG @$CHANNEL"
 
+          # ⚠️ `first // empty` inside jq, NOT `... | .number" | head -1`. Do not
+          # "simplify" it back. Under `pipefail`, `head` closing the pipe can
+          # kill a still-writing producer with SIGPIPE, making the step exit 141
+          # — and it would do so ONLY when a duplicate issue exists, which is
+          # the worst place for an intermittent failure and the hardest to
+          # attribute.
+          #
+          # ⚠️ IT IS NOT A SIZE THRESHOLD, and reading it as one is the trap.
+          # The condition is whether the producer is still writing when head
+          # closes, which is SCHEDULING. Measured 15 runs per size on this
+          # machine: 20 -> 0/15, 100 -> 0/15, 1000 -> 0/15, 4000 -> 2/15,
+          # 8000 -> 15/15. That 2/15 is the tell — there is a probabilistic
+          # band, not a line. On another machine the same day, 100 lines failed
+          # 13/15. The onset moves ~40x between machines, and CI is a third one.
+          #
+          # So `--limit 20` is not "safely inside a buffer"; it is a number that
+          # happened not to fire in 30 runs across two machines. The jq form
+          # removes the dependency on scheduling altogether, which is why this
+          # does not need the limit to stay small to stay correct.
           NUM=$(gh issue list -R vLannaAi/noy-db-docs --state open --limit 20 \
             --search "$TITLE in:title" \
-            --json number,title --jq ".[] | select(.title == \"$TITLE\") | .number" | head -1)
+            --json number,title --jq "[.[] | select(.title == \"$TITLE\") | .number] | first // empty")
 
           if [ -n "$NUM" ]; then
             gh issue comment "$NUM" -R vLannaAi/noy-db-docs --body-file /tmp/doc-sync.md

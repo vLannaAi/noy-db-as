@@ -1,33 +1,60 @@
-// check-peer-floor — does every store actually COMPILE against the oldest
+// check-peer-floor — does every package actually COMPILE against the oldest
 // @noy-db/hub its peer range admits?
+//
+// ⚠️ VOCABULARY. This script was ported from noy-db-to and called these
+// packages "stores" throughout, including in its exported helper. They are not
+// stores. In this family the PREFIX IS THE LAYER, and the difference is not
+// cosmetic: an `as-*` package sees PLAINTEXT by design, because it runs after
+// decryption, while a store never sees anything but ciphertext. That is the
+// distinction deciding who owns a plaintext-addressing bug, it is what this
+// repo's CLAUDE.md leads with, and it is why check-architecture's `to-only`
+// rule had to be rewritten as `no-runtime-store-import` rather than ported.
+// A reader who took this file's old vocabulary at face value had the layer
+// exactly backwards.
 //
 // Why this exists, and why it is separate from check-architecture.mjs:
 //
 // `hub-peer-range` in check-architecture asserts the peer is *a range*. It
 // cannot assert the range is *true*, because truth requires resolving symbols
 // out of a hub version that is not installed. Every other gate in this repo —
-// build, lint, typecheck, 1717 tests — runs against the DEV PIN, so all of them
+// build, lint, typecheck, 374 tests — runs against the DEV PIN, so all of them
 // stay green no matter how wrong the declared range is. The dev pin is a proxy
 // for the range, and it always answers reassuringly.
 //
-// That gap shipped twice:
+// That gap shipped twice. ⚠️ BOTH INCIDENTS ARE noy-db-to's, NOT THIS REPO'S —
+// the header was ported verbatim and told them as local history. The MECHANISM
+// is what transfers and is why this check compiles instead of grepping; only
+// the ownership did not. They are kept rather than deleted, because deleting
+// them would throw away the reasoning along with the enumeration.
 //
-//   #89  16 packages advertised ^0.3.0 || ^0.4.0 || ^0.5.0 while importing
-//        StoreLocator / StoreDescriptor / StoreFactory, which exist only from
-//        0.6.0-pre. `npm i @noy-db/to-postgres @noy-db/hub` satisfied the peer
-//        check and then failed to typecheck. The same defect was live on the
-//        0.5.0 stable line and had to be repaired by deprecating 17 versions.
+//   noy-db-to #89   16 packages advertised ^0.3.0 || ^0.4.0 || ^0.5.0 while
+//        importing StoreLocator / StoreDescriptor / StoreFactory, which exist
+//        only from 0.6.0-pre. `npm i @noy-db/to-postgres @noy-db/hub`
+//        satisfied the peer check and then failed to typecheck. The same
+//        defect was live on the 0.5.0 stable line and had to be repaired by
+//        deprecating 17 to-* versions.
+//        ⚠️ That "17 deprecated versions" number is noy-db-to's, and it
+//        travelled: release.yml here inherited it as a claim about as-* and
+//        stated it in a LIVE ERROR MESSAGE until 2026-09-01. Measured against
+//        the registry that day, every as-* package is {latest: 0.7.0,
+//        next: 0.7.0} — healthy on both rails, nothing deprecated. If you are
+//        about to copy this paragraph somewhere, the number does not come
+//        with it.
 //
-//   #84  to-drive / to-icloud register a NoydbPodStore factory without a cast,
-//        which needs StoreLocator.register() to be generic over both store
-//        shapes — landed in 0.6.0-pre.11. SYMBOL PRESENCE DOES NOT CATCH THIS:
-//        StoreFactory exists at 0.6.0-pre.0, it just cannot accept the
-//        argument. Only compiling against the floor finds it.
+//   noy-db-to #84   to-drive / to-icloud register a NoydbPodStore factory
+//        without a cast, which needs StoreLocator.register() to be generic
+//        over both store shapes — landed in 0.6.0-pre.11. SYMBOL PRESENCE
+//        DOES NOT CATCH THIS: StoreFactory exists at 0.6.0-pre.0, it just
+//        cannot accept the argument. Only compiling against the floor finds
+//        it. (The Store* names here are real hub API symbols from that
+//        incident — they are quoted, not this repo's vocabulary.)
 //
 // So this check COMPILES; it does not grep. That distinction is the whole
 // point and should not be optimised away.
 //
-// Cost: one `pnpm install` per DISTINCT floor (currently two), not per package.
+// Cost: one `pnpm install` per DISTINCT floor — currently ONE, since all ten
+// packages declare ^0.7.0. (The ported header said "currently two", which was
+// noy-db-to's shape. Do not hardcode the number; the script derives it.)
 // Intended for CI, not for the lint path — it needs the network.
 //
 // Usage:  node scripts/check-peer-floor.mjs
@@ -63,7 +90,7 @@ try {
 
 const readJson = (p) => JSON.parse(readFileSync(p, 'utf8'))
 
-export function storeDirs() {
+export function packageDirs() {
   return readdirSync(ROOT)
     .filter((d) => d.startsWith('as-'))
     .map((d) => join(ROOT, d))
@@ -130,7 +157,7 @@ export function pinnedRootText(originalText, floor) {
 // ── Plan: group packages by the minimum hub version their range admits ──────
 export function planGroups() {
   const groups = new Map() // floor -> [{name, dir, range}]
-  for (const dir of storeDirs()) {
+  for (const dir of packageDirs()) {
     const pj = readJson(join(dir, 'package.json'))
     const range = pj.peerDependencies?.['@noy-db/hub']
     if (!range) continue // check-architecture's hub-peer-range already fails this
@@ -151,13 +178,13 @@ export function planGroups() {
 function main() {
 const groups = planGroups()
 
-// Report what was actually GROUPED, not how many stores exist. A package whose
+// Report what was actually GROUPED, not how many packages exist. A package whose
 // peer range is absent or empty is skipped above (check-architecture fails it
 // by name, and exits 1), and printing the directory count would claim coverage
 // this run does not have.
 const checked = [...groups.values()].reduce((n, pkgs) => n + pkgs.length, 0)
-const total = storeDirs().length
-const scope = checked === total ? `${total} stores` : `${checked} of ${total} stores (${total - checked} skipped — no peer range)`
+const total = packageDirs().length
+const scope = checked === total ? `${total} packages` : `${checked} of ${total} packages (${total - checked} skipped — no peer range)`
 console.log(`Peer-floor check — ${groups.size} distinct floor(s) across ${scope}\n`)
 for (const [floor, pkgs] of groups) {
   console.log(`  @noy-db/hub@${floor}`)
@@ -196,14 +223,30 @@ try {
       continue
     }
 
-    // Build the group AND its workspace dependencies first. Several stores
-    // import a sibling (to-cloudflare-r2 → to-aws-s3, to-supabase →
-    // to-postgres) and resolve it through the workspace link, whose `types`
-    // field points into dist/. Without this the typecheck fails with TS2307
-    // "Cannot find module" — which looks exactly like a peer-range failure and
-    // is not one. The `...` suffix pulls in each package's workspace deps, so
-    // the build stays inside this group's floor rather than rebuilding stores
-    // that declare a different one.
+    // Build the group AND its workspace dependencies first.
+    //
+    // ⚠️ THE PORTED JUSTIFICATION DOES NOT HOLD HERE, and it is left corrected
+    // rather than translated. It read: "several packages import a sibling
+    // (to-cloudflare-r2 → to-aws-s3, to-supabase → to-postgres) and resolve it
+    // through the WORKSPACE LINK, whose `types` field points into dist/, so
+    // without this the typecheck fails TS2307 — which looks exactly like a
+    // peer-range failure and is not one."
+    //
+    // That is noy-db-to's situation. This repo has ONE internal edge,
+    // as-xlsx → as-zip, and it is a caret range rather than `workspace:*`, so
+    // pnpm resolves it from the REGISTRY, not from the sibling directory.
+    // MEASURED 2026-09-01: as-xlsx/node_modules/@noy-db/as-zip resolves into
+    // node_modules/.pnpm/@noy-db+as-zip@0.7.0_.../, not into ../as-zip. A
+    // registry tarball already ships its dist/, so sibling resolution here
+    // needs no prior build.
+    //
+    // ⚠️ That makes the STATED reason wrong; it does NOT establish that the
+    // build is unnecessary. Whether anything else in the typecheck depends on
+    // it has not been measured, and removing a step that a green check depends
+    // on, on the strength of a comment, is how a working gate gets broken by a
+    // documentation fix. Left in place deliberately, with the reason corrected.
+    // The `...` suffix still keeps the build inside this group's floor rather
+    // than rebuilding packages that declare a different one.
     const buildFilters = pkgs.flatMap((p) => ['--filter', `${p.name}...`])
     try {
       run('pnpm', [...buildFilters, 'build'])
@@ -252,7 +295,7 @@ if (failures.length) {
   console.error('consumers hit it as a broken install, not as a refused one.')
   process.exit(1)
 }
-console.log('✓ every store compiles against the oldest @noy-db/hub its peer range admits')
+console.log('✓ every package compiles against the oldest @noy-db/hub its peer range admits')
 }
 
 if (isMain) main()

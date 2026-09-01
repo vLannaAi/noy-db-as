@@ -1,6 +1,6 @@
 name: Release to npm
 
-# Strict release pipeline for the noy-db-as storage adapters.
+# Strict release pipeline for the noy-db-as export formats.
 #
 # Triggered on GitHub Release `published`. Runs the full verification
 # gate (install + build + lint + typecheck + test) on a clean checkout
@@ -13,9 +13,9 @@ name: Release to npm
 #
 # ── npm dist-tag routing ─────────────────────────────────────────────
 #
-#   • `latest` — the default install (`pnpm add @noy-db/to-aws-s3`). Used
+#   • `latest` — the default install (`pnpm add @noy-db/as-csv`). Used
 #     for stable themed releases.
-#   • `next`   — opt-in early-adopter channel (`pnpm add @noy-db/to-aws-s3@next`).
+#   • `next`   — opt-in early-adopter channel (`pnpm add @noy-db/as-csv@next`).
 #
 # Routing rules:
 #   - `release` event with `prerelease: true` (the "Set as a pre-release"
@@ -110,19 +110,45 @@ jobs:
       - name: Test
         run: pnpm test
 
-      # The root package.json version is the lockstep canonical for the repo.
-      # Per-store version==tag enforcement (Step 1b) is added when stores land.
-      - name: Verify package.json version matches release tag
+      # ⚠️ PORTED DEFECT, FIXED 2026-09-01. This step read `./package.json`'s
+      # version — but this repo's root manifest is `"private": true` and carries
+      # NO version field, so PKG_VERSION was the literal string "undefined" and
+      # EVERY release event would have failed here. Inherited from a sibling
+      # whose root manifest IS versioned: the premise did not survive the port.
+      # Nothing executed it, because no release has been cut from this repo yet
+      # — the defect was waiting for the first one.
+      #
+      # The ten package manifests ARE the version. check:versions-uniform proves
+      # they agree with each other; this proves they agree with the tag. Both
+      # halves are needed: ten packages uniformly on the WRONG version passes the
+      # first check and fails this one.
+      - name: Verify every package version matches the release tag
         if: github.event_name == 'release'
         run: |
           TAG="${{ github.event.release.tag_name }}"
           VERSION="${TAG#v}"
-          PKG_VERSION=$(node -p "require('./package.json').version")
-          if [ "$PKG_VERSION" != "$VERSION" ]; then
-            echo "❌ noy-db-as storage adapters version ($PKG_VERSION) does not match release tag ($VERSION)"
-            exit 1
-          fi
-          echo "✅ noy-db-as@$PKG_VERSION matches release tag v$VERSION"
+          pnpm check:versions-uniform
+          FAILED=0
+          for f in as-*/package.json; do
+            NAME=$(node -p "require('./$f').name")
+            PKG_VERSION=$(node -p "require('./$f').version")
+            if [ "$PKG_VERSION" != "$VERSION" ]; then
+              echo "::error::$NAME is $PKG_VERSION, but the release tag says $VERSION"
+              FAILED=1
+            fi
+          done
+          [ "$FAILED" = "0" ] || exit 1
+          echo "✅ every @noy-db/as-* package is $VERSION, matching release tag v$VERSION"
+
+      # git-is-not-npm, made executable. Every other gate in this job asks a
+      # question about the TREE; not one asks the registry. This repo learned
+      # why: core cut 0.7.0 with these ten packages still in its monorepo and
+      # removed them immediately afterwards, so npm carried 0.7.0 for all ten
+      # while this tree still claimed 0.7.0-pre.17 — with every in-repo gate
+      # green, because none of them could see the registry.
+      - name: Refuse a version the registry already carries
+        if: github.event_name == 'release'
+        run: pnpm check:not-already-published
 
       # The dist-tag is routed entirely by the "Set as a pre-release" checkbox on
       # the Release form, so a forgotten tick publishes a pre-release to @latest.
@@ -134,18 +160,22 @@ jobs:
       # deprecate` is a different endpoint and has NOT been tested this way —
       # do not widen this into "account-changing writes are automatable".
       #
-      # This repo is the one that most needs the guard and was the last to get
-      # it. Its @latest is already broken — all 17 as-*@0.5.0 versions are
-      # deprecated, and it cannot be repaired with anything short of a stable
-      # release, which is blocked. Landing a pre-release on top of that would
-      # add a second, independent defect to the same tag.
+      # ⚠️ The justification here was PORTED and is FALSE for this repo. It
+      # claimed "@latest is already broken — all 17 as-*@0.5.0 versions are
+      # deprecated", and told an anecdote about to-browser-fs, a package that
+      # does not exist here. Both belong to noy-db-to. Measured 2026-09-01
+      # against the live registry: every as-* package has dist-tags
+      # {latest: 0.7.0, next: 0.7.0} — a healthy stable on both rails.
       #
-      # It has also already happened here by a different route: to-browser-fs
-      # debuted in 0.6.0-pre.2, and npm sets `latest` on a package's FIRST
-      # publish regardless of --tag, so to-browser-fs@latest is pinned to a
-      # pre-release and later `--tag next` publishes never move it. That path is
-      # not what this step catches — no guard can, it is npm's own behaviour —
-      # but it is the same end state, which is the point.
+      # The guard stays, and the TRUE reason is the stronger one: this @latest
+      # is healthy, so there is something to lose. A pre-release landing on it
+      # would be the FIRST defect on that tag rather than a second one on an
+      # already-broken tag, and a dist-tag is only repairable by publishing
+      # something else to move it.
+      #
+      # The related npm behaviour worth knowing, which NO guard can catch:
+      # npm sets `latest` on a package's FIRST publish regardless of --tag.
+      # That is npm's own behaviour, not something this step can prevent.
       #
       # Ported from noy-db-ui#22 via klum-db#81 / noy-db#1003; mechanism is
       # identical so all four repos behave the same.
@@ -159,7 +189,7 @@ jobs:
           VERSION="${TAG#v}"
           if [ "${{ github.event.release.prerelease }}" != "true" ] && [ "${VERSION#*-}" != "$VERSION" ]; then
             echo "::error::$VERSION is a semver pre-release, but this Release is not marked as a pre-release."
-            echo "::error::Publishing would route it to @latest, which is already broken here (17 deprecated 0.5.0 versions)."
+            echo "::error::Publishing would route it to @latest, which currently carries a healthy stable (0.7.0)."
             echo "::error::Tick 'Set as a pre-release' on the Release and re-run."
             exit 1
           fi
@@ -277,9 +307,9 @@ jobs:
           echo "- **Reason:** $REASON" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           if [ "$TAG" = "latest" ]; then
-            echo "Consumers run \`pnpm add @noy-db/to-aws-s3\` (default install)." >> "$GITHUB_STEP_SUMMARY"
+            echo "Consumers run \`pnpm add @noy-db/as-csv\` (default install)." >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "Consumers run \`pnpm add @noy-db/to-aws-s3@$TAG\` (opt-in channel)." >> "$GITHUB_STEP_SUMMARY"
+            echo "Consumers run \`pnpm add @noy-db/as-csv@$TAG\` (opt-in channel)." >> "$GITHUB_STEP_SUMMARY"
           fi
 
       # Check which npm account the token belongs to. If this step fails,
@@ -323,7 +353,7 @@ jobs:
           echo "- Release: \`${{ github.event.release.tag_name || github.ref_name }}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- npm dist-tag: \`${{ steps.dist_tag.outputs.tag }}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Provenance: enabled (look for the ✓ on https://www.npmjs.com/package/@noy-db/to-aws-s3)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Provenance: enabled (look for the ✓ on https://www.npmjs.com/package/@noy-db/as-csv)" >> "$GITHUB_STEP_SUMMARY"
 
   # ── Align dist-tags after a STABLE publish ───────────────────────────
   #
@@ -419,6 +449,26 @@ jobs:
   #
   # noy-db/.github/workflows/release.yml gates its equivalent job the same
   # way — keep the two in step.
+  #
+  # ⛔⛔ INHERITED FROM noy-db-to AND NON-FUNCTIONAL HERE, measured 2026-09-01.
+  # This job references three files that do not exist in this repo:
+  #
+  #     scripts/docs-bridge/build-payload.mjs
+  #     scripts/sync/sync.mjs
+  #     scripts/__tests__/docs-bridge-capabilities.test.ts
+  #
+  # So it would fail on the first Release cut from here. It is not merely
+  # missing files, either: the bridge payload is STORE-SCOPED BY DESIGN —
+  # build-payload.mjs filters on a `to-` prefix so that both producers emit a
+  # schema noy-db-docs can parse unchanged. as-* packages are not stores, and
+  # the schema has no slot for them. Porting the scripts verbatim would produce
+  # a payload that is empty by construction, which the family record already
+  # names as its own failure shape (COMPLETE-AND-EMPTY: a proof pair that is
+  # present, green, and communicates nothing).
+  #
+  # Left in place, unrun and clearly marked, pending a decision: delete the job,
+  # or design an as-* notification path. Deleting it silently would erase the
+  # only record that docs currently have NO channel for this family's releases.
   docs-bridge:
     name: Docs bridge payload + notify
     needs: publish
@@ -447,11 +497,13 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      # The capability dump imports each store's SOURCE, but stores that
-      # import a workspace sibling (to-cloudflare-r2 → @noy-db/to-aws-s3,
-      # to-supabase → @noy-db/to-postgres) resolve that sibling through its
-      # exports map into dist/ — so the dump needs built dists on a fresh
-      # runner (first observed: v0.3.0-pre.4 run, "Failed to resolve entry").
+      # ⚠️ THIS JOB IS NOT WIRED UP FOR THIS REPO — see the note on the job.
+      # The comment below describes noy-db-to's stores and their workspace
+      # siblings (to-cloudflare-r2 → @noy-db/to-aws-s3, to-supabase →
+      # @noy-db/to-postgres). Neither package exists here, and the capability
+      # dump it describes has no as-* equivalent. Left verbatim rather than
+      # half-translated, because a plausible-looking translation of a comment
+      # about a different repo is worse than an obviously foreign one.
       - name: Build
         run: pnpm build
 

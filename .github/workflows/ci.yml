@@ -55,6 +55,18 @@ jobs:
       # obligation did too. Nothing compiles a migration map.
       - name: Codemod rows agree with this repo's source
         run: pnpm check:codemod-rows
+      # These ten packages are ONE lockstep line whose version lives in ten
+      # separate files plus one internal range (as-xlsx -> as-zip, a peer).
+      # An edit that misses one is locally correct and passes every other gate
+      # here; it surfaces only as an ERESOLVE in a consumer's install.
+      #
+      # check:not-already-published is deliberately NOT run here. It is false by
+      # design between releases — main legitimately sits at the last published
+      # version — so running it on every push would make main permanently red,
+      # and a permanently-red check is one people learn to ignore. It gates the
+      # RELEASE instead, which is the only moment its answer decides anything.
+      - name: One version across the line, and every internal range admits it
+        run: pnpm check:versions-uniform
       - name: Lint
         run: pnpm lint
       - name: Typecheck

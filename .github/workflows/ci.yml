@@ -1,6 +1,11 @@
 name: CI
 
-# Standard CI for noy-db-as: the non-essential @noy-db/as-* storage adapters.
+# Standard CI for noy-db-as: the @noy-db/as-* export formats.
+#
+# (Ported header said "the non-essential @noy-db/as-* storage adapters". Both
+# halves were wrong: these are FORMATS, not stores — the prefix is the layer —
+# and "non-essential" was noy-db-to's split, where four essential to-* stores
+# stayed in core. All ten as-* packages came here; none is a remainder.)
 # Multi-package pnpm workspace: check:architecture → install → build → lint → typecheck → test
 # across the runtime-supported Node versions (22 + 24).
 

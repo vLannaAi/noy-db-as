@@ -160,7 +160,21 @@ export function planGroups() {
   for (const dir of packageDirs()) {
     const pj = readJson(join(dir, 'package.json'))
     const range = pj.peerDependencies?.['@noy-db/hub']
-    if (!range) continue // check-architecture's hub-peer-range already fails this
+    // Skipping is safe ONLY because check-architecture's `hub-peer-range` fails
+    // a missing hub peer UNCONDITIONALLY here. Verified by mutation, 2026-09-01:
+    // delete as-blob's hub peer and check-architecture exits 1 naming it.
+    //
+    // ⚠️ THIS IS A CROSS-FILE COUPLING, and it has already broken in a sibling.
+    // noy-db-on carries the identical line, but ITS check-architecture
+    // deliberately exempts packages that import hub nowhere (on-email-otp,
+    // on-threat, on-totp), so over there a peer-less package is skipped by BOTH
+    // gates and checked by neither. If an `as-*` package ever legitimately stops
+    // importing hub and this repo grants the same exemption, this `continue`
+    // becomes the same hole — and nothing here would say so.
+    //
+    // So: do NOT harden this into a hard failure (it would break the exemption
+    // case), and do NOT relax check-architecture without revisiting this line.
+    if (!range) continue
     const floor = floorOf(range)
     if (!floor) {
       console.error(`✗ ${pj.name}: no floor to check "${range}" against.`)

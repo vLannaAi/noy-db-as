@@ -25,9 +25,22 @@ Nothing yet. The line sits at `0.7.0`, which the registry already carries, so
   which does not exist here — the root is `private: true`. It compared the
   string `"undefined"` against the tag and would have failed every release. It
   now checks the ten package manifests.
-- `docs-bridge` in `release.yml` is marked non-functional. It references three
-  files this repo does not have, and the payload schema it targets is
-  store-scoped by design, so as-* has no slot in it. Pending a decision.
+- The npm auth pre-flight in the publish job is now **fatal**. It was
+  `continue-on-error: true` and its `||` branch swallowed the exit status, so it
+  could not have failed by either route — it printed the right answer and was
+  wired to nothing. npm reports write-path auth failures as 404, so a bad token
+  previously sailed past it and surfaced on publish as "not in this registry",
+  which reads as a missing package rather than an auth problem.
+- The `docs-bridge` job is **removed**. It referenced two files this repo does
+  not have and was `continue-on-error` at the job level, so every release would
+  have died at "Build payload" while the run still reported green — producing
+  neither half of the documented proof pair. Porting it is not a copy: the
+  payload builder filters on a `to-` prefix by design, so run here it emits zero
+  packages and the job's own guard fails. Decided at the coordination layer for
+  all three extracted repos: file the doc-sync issue directly from the workflow
+  instead, since noy-db-docs' pin check reads the issue body rather than the
+  Release body. Not yet wired — it needs noy-db-docs' agreement and a token
+  scoped to their repo, and until then no job is the honest state.
 
 ## 0.7.0
 

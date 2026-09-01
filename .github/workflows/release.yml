@@ -491,14 +491,24 @@ jobs:
           # absence-of-error: an empty list and a failed glob look identical,
           # and filing an empty doc-sync issue trains people to close them
           # unread — which is the reason the old bridge gated on a real delta.
-          PACKAGES=$(for f in as-*/package.json; do
-            node -p "const j = require('./$f'); j.name + '@' + j.version"
-          done | sort)
-          COUNT=$(printf '%s\n' "$PACKAGES" | grep -c . || true)
+          # ⚠️ nullglob is load-bearing. WITHOUT it an unmatched glob is left
+          # as the LITERAL string `as-*/package.json`, node throws
+          # MODULE_NOT_FOUND, and `set -e` kills the script BEFORE the count is
+          # computed — so the guard below never runs and the operator gets a
+          # raw node stack trace instead of a sentence naming the problem.
+          # Measured: the failure DIRECTION was already right, but the message
+          # was unreachable by the exact path it was written for.
+          shopt -s nullglob
+          PKG_FILES=(as-*/package.json)
+          shopt -u nullglob
+          COUNT=${#PKG_FILES[@]}
           if [ "$COUNT" -eq 0 ]; then
             echo "::error::No as-* packages found — refusing to file an empty doc-sync issue."
             exit 1
           fi
+          PACKAGES=$(for f in "${PKG_FILES[@]}"; do
+            node -p "const j = require('./$f'); j.name + '@' + j.version"
+          done | sort)
 
           {
             echo "\`noy-db-as\` published **$TAG** to \`@$CHANNEL\`."

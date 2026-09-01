@@ -1,5 +1,5 @@
 import { readdirSync, statSync, existsSync, readFileSync } from 'node:fs'
-import { join, resolve, relative } from 'node:path'
+import { basename, join, resolve, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 // ARCH_ROOT lets the self-test point the scan at a fixtures dir; default is
@@ -97,6 +97,50 @@ function checkNoRuntimeStoreImport() {
     })
   }
 }
+
+function checkAsConformanceFixture() {
+  // Rule — as-conformance-fixture. RELOCATED FROM noy-db 2026-09-01, where it
+  // could no longer work: after the as-* family left, its `as-` scan matched
+  // NOTHING, so it would iterate an empty list, pass unconditionally, and read
+  // in that file as live coverage of a family that is not there. The rule did
+  // not stop mattering; the packages moved, so the guard moves with them.
+  //
+  // WHY IT EXISTS (noy-db #1209), and it is not hypothetical: when the 0.7 line
+  // inverted four formats their conformance fixtures stopped typechecking and
+  // were DELETED rather than migrated. Nothing noticed — **a deleted test does
+  // not fail** — so coverage fell from nine formats to five while the suite
+  // stayed green and the ADR went on claiming every as-* entry point was
+  // conformance-tested.
+  //
+  // as-aws-s3 is EXEMPT, and by DESIGN rather than by oversight: it exports
+  // `asAwsS3(options)` and is a DESTINATION, not a format. It has no
+  // encode/decode and therefore no gate call of its own to conform. Verified
+  // against its source at relocation. Named explicitly rather than skipped by a
+  // looser pattern, so a real format package can never ride the exemption.
+  const DESTINATIONS = new Set(['as-aws-s3'])
+  // listStoreDirs() yields ABSOLUTE paths, not names — take the basename before
+  // comparing against the exemption set or the failure would name a full path
+  // and the exemption would never match.
+  for (const dir of listStoreDirs()) {
+    const name = basename(dir)
+    if (DESTINATIONS.has(name)) continue
+    const testsDir = join(dir, '__tests__')
+    let found = false
+    if (existsSync(testsDir)) {
+      for (const f of readdirSync(testsDir)) {
+        if (!f.endsWith('.ts')) continue
+        if (readFileSync(join(testsDir, f), 'utf8').includes('runFormatConformanceTests(')) { found = true; break }
+      }
+    }
+    if (!found)
+      fail('as-conformance-fixture',
+        `${name} has no test invoking runFormatConformanceTests. Every as-* FORMAT runs the published gate kit — ` +
+        `when the 0.7 inversion broke four fixtures they were deleted instead of migrated and coverage silently ` +
+        `dropped from nine formats to five (noy-db #1209). Write the fixture; do not delete it.`, name)
+  }
+}
+
+checkAsConformanceFixture()
 
 // Rule 3 — no-crypto-deps: zero npm crypto packages (stores see ciphertext only).
 const BANNED = new Set(['crypto-js', 'node-forge', 'tweetnacl', 'bcryptjs', 'bcrypt'])

@@ -1,6 +1,6 @@
 {
   "name": "@noy-db/as-xlsx",
-  "version": "0.7.0",
+  "version": "0.7.1-pre.0",
   "description": "Excel spreadsheet plaintext export for noy-db \u2014 produces a real .xlsx (Office Open XML) from one or more collections. Multi-sheet, Unicode-safe via shared-strings table. Zero runtime deps beyond the workspace zip encoder. Gated by `vault.assertCanExport('plaintext', \u2026)` with format `'xlsx'`.",
   "license": "MIT",
   "author": "vLannaAi <vicio@lanna.ai>",
@@ -39,13 +39,13 @@
   },
   "peerDependencies": {
     "@noy-db/hub": "^0.7.0",
-    "@noy-db/as-zip": "^0.7.0"
+    "@noy-db/as-zip": "^0.7.1-pre.0"
   },
   "dependencies": {
     "fast-xml-parser": "^5.0.0"
   },
   "devDependencies": {
-    "@noy-db/as-zip": "^0.7.0",
+    "@noy-db/as-zip": "^0.7.1-pre.0",
     "@noy-db/hub": "0.7.0",
     "@noy-db/test-format-conformance": "0.7.0",
     "@noy-db/to-memory": "0.7.0",

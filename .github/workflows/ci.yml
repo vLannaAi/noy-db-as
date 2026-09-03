@@ -12,8 +12,12 @@ name: CI
 on:
   push:
     branches: [main]
+  # NO `branches:` filter on pull_request, deliberately. That key filters on the
+  # PR's BASE branch, so `branches: [main]` silently skips every stacked PR — and
+  # GitHub renders "no checks reported", which reads as pending rather than as
+  # never-ran. Worse here than the bare case: peer-floor.yml has no such filter,
+  # so a stacked PR shows SOME green checks and no CI at all. (lanna-db#12)
   pull_request:
-    branches: [main]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -72,6 +76,11 @@ jobs:
       # RELEASE instead, which is the only moment its answer decides anything.
       - name: One version across the line, and every internal range admits it
         run: pnpm check:versions-uniform
+      # Runs AFTER build on purpose: the blocks compile against each package's
+      # built `dist`, and the check refuses to run against an unbuilt package
+      # rather than passing having resolved every import to `any`.
+      - name: Shipped README examples compile
+        run: pnpm check:prose-examples
       - name: Lint
         run: pnpm lint
       - name: Typecheck

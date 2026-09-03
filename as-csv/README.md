@@ -82,15 +82,27 @@ Dates render as ISO strings rather than locale-formatted — spreadsheet consume
 This package does NOT write an audit-ledger entry yet — that lands with the full vault-level gated wrappers in a #249 follow-up. For now, applications using `@noy-db/as-csv` should write their own `type: 'as-export'` ledger entry after each call:
 
 ```ts
-await vault.collection<AsExportEntry>('_ledger_custom').put(ulid(), {
-  type: 'as-export',
-  encrypted: false,
-  package: '@noy-db/as-csv',
-  collection: options.collection,
-  recordCount: records.length,
-  actor: currentUserId,
-  timestamp: new Date().toISOString(),
-})
+interface AsExportEntry {
+  type: 'as-export'
+  encrypted: boolean
+  package: string
+  collection: string
+  recordCount: number
+  actor: string
+  timestamp: string
+}
+
+async function recordExport(collection: string, recordCount: number, actor: string) {
+  await vault.collection<AsExportEntry>('_ledger_custom').put(crypto.randomUUID(), {
+    type: 'as-export',
+    encrypted: false,
+    package: '@noy-db/as-csv',
+    collection,
+    recordCount,
+    actor,
+    timestamp: new Date().toISOString(),
+  })
+}
 ```
 
 ## Related packages

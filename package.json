@@ -10,6 +10,7 @@
     "check:declared-deps": "node scripts/check-declared-deps.mjs",
     "check:not-already-published": "node scripts/check-not-already-published.mjs",
     "check:peer-floor": "node scripts/check-peer-floor.mjs",
+  "check:prose-examples": "node scripts/check-prose-examples.mjs",
     "check:versions-uniform": "node scripts/check-versions-uniform.mjs",
     "lint": "pnpm -r lint",
     "test": "vitest run",

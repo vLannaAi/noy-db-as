@@ -15,7 +15,9 @@ Pass `password` to encrypt every entry with WinZip-AES-256
 (vendor version AE-2):
 
 ```ts
-const archive = await asZip.toBytes(vault, {
+import { toBytes } from '@noy-db/as-zip'
+
+const archive = await toBytes(vault, {
   records: { collection: 'invoices' },
   password: 'shared-with-recipient-2026',
 })
@@ -26,7 +28,11 @@ recognising WinZip-AES (7-Zip, Archive Utility, WinRAR, modern
 unzip builds) prompt for the password on extract. Read back via:
 
 ```ts
-const decoded = await asZip.fromBytes(vault, archive, {
+import { fromBytes } from '@noy-db/as-zip'
+
+declare const archive: Uint8Array // the bytes produced above
+
+const decoded = await fromBytes(vault, archive, {
   collection: 'invoices',
   password: 'shared-with-recipient-2026',
 })
@@ -66,6 +72,7 @@ isolation (the archive concatenates them anyway).
 ```ts
 await db.grant('firm', {
   userId: 'auditor',
+  displayName: 'Pranee',
   role: 'viewer',
   secret: '…',
   exportCapability: { plaintext: ['zip'] },
@@ -82,7 +89,8 @@ import { toBytes } from '@noy-db/as-zip'
 const bytes = await toBytes(vault, {
   records: {
     collection: 'invoices',
-    filter: (r) => r.status === 'paid', // optional
+    // `filter` receives `unknown` — narrow it yourself:
+    filter: (r) => (r as { status: string }).status === 'paid', // optional
   },
   attachments: {
     slots: ['raw', 'thumb'], // optional; default '*' = every slot
@@ -130,7 +138,7 @@ Finder/Explorer without tooling.
 
 ### `manifest.json` shape
 
-```ts
+```jsonc
 {
   _noydb_archive: 1,
   collection: 'invoices',
@@ -156,7 +164,7 @@ import { writeZip, type ZipEntry } from '@noy-db/as-zip'
 
 const bytes = writeZip([
   { path: 'hello.txt', bytes: new TextEncoder().encode('hi') },
-  { path: 'blob.bin', bytes: someUint8Array },
+  { path: 'blob.bin', bytes: new Uint8Array([0xde, 0xad]) },
 ])
 ```
 

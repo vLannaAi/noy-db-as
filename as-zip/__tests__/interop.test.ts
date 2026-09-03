@@ -21,6 +21,32 @@ function hasTool(name: string): boolean {
   return spawnSync(cmd, [name], { stdio: 'pipe' }).status === 0
 }
 
+/**
+ * Skipping is right on a developer machine and WRONG in CI.
+ *
+ * These blocks skip when `7z`/`7zz`/`unar` are absent, which is what makes the
+ * file runnable locally. But `pnpm test` runs it in CI too, where a missing tool
+ * produced a silent skip inside an otherwise green suite — a skipped test and a
+ * passing one are indistinguishable in a summary. noy-db's own interop job
+ * installed `unar` on macOS ONLY, so its Linux and Windows legs skipped two of
+ * three blocks, greenly, for as long as the job existed (noy-db #1331).
+ *
+ * With NOYDB_INTEROP_REQUIRE=1 a missing tool is a FAILURE naming the tool.
+ * Set it wherever the tools are installed on purpose; leave it unset locally.
+ */
+const REQUIRE_TOOLS = process.env.NOYDB_INTEROP_REQUIRE === '1'
+
+function requireOrSkip(tool: string, found: boolean): boolean {
+  if (found) return false
+  if (REQUIRE_TOOLS) {
+    throw new Error(
+      `NOYDB_INTEROP_REQUIRE=1 but \`${tool}\` is not on PATH. ` +
+        `Install it, or unset the variable to skip these vectors.`,
+    )
+  }
+  return true
+}
+
 // Homebrew sevenzip installs as `7zz` on macOS; Linux p7zip-full uses `7z`.
 function find7z(): string | null {
   if (hasTool('7z')) return '7z'
@@ -56,7 +82,7 @@ const VECTORS = [
 
 describe('our writer → 7-Zip reader', () => {
   const sevenZip = find7z()
-  const skip = sevenZip === null
+  const skip = requireOrSkip('7z (or 7zz)', sevenZip !== null)
 
   for (const v of VECTORS) {
     it(
@@ -89,7 +115,7 @@ describe('our writer → 7-Zip reader', () => {
 // ── Our writer → unar reader ───────────────────────────────────────────
 
 describe('our writer → unar reader', () => {
-  const skip = !hasTool('unar')
+  const skip = requireOrSkip('unar', hasTool('unar'))
 
   for (const v of VECTORS) {
     it(
@@ -124,7 +150,7 @@ describe('our writer → unar reader', () => {
 
 describe('7-Zip writer → our reader', () => {
   const sevenZip = find7z()
-  const skip = sevenZip === null
+  const skip = requireOrSkip('7z (or 7zz)', sevenZip !== null)
 
   // Omit 'nonascii' — path contains a slash, making the entryPath inside
   // the archive OS-dependent when 7z is invoked with cwd.

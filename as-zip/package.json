@@ -39,7 +39,7 @@
     "interop:fixtures": "node scripts/interop-fixtures.mjs"
   },
   "peerDependencies": {
-    "@noy-db/hub": "^0.7.0"
+    "@noy-db/hub": "^0.7.0 || ^0.7.1-pre.0"
   },
   "devDependencies": {
     "@noy-db/hub": "0.7.0",

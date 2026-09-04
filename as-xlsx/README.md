@@ -25,6 +25,7 @@ pnpm add @noy-db/as-xlsx @noy-db/as-zip @noy-db/hub
 ```ts
 await db.grant('firm', {
   userId: 'accountant',
+  displayName: 'Somchai',
   role: 'viewer',
   secret: '…',
   exportCapability: { plaintext: ['xlsx'] }, // or ['*']
@@ -47,7 +48,8 @@ const bytes = await toBytes(vault, {
       name: 'Invoices',
       collection: 'invoices',
       columns: ['id', 'client', 'amount', 'status', 'issueDate'],
-      filter: (r) => r.status !== 'draft',
+      // `filter` receives `unknown` — narrow it yourself:
+      filter: (r) => (r as { status: string }).status !== 'draft',
     },
     { name: 'Payments', collection: 'payments' },
   ],

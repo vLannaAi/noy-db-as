@@ -22,17 +22,25 @@
  * but do NOT copy two of its choices, both deliberate there and wrong here:
  *
  *   1. It carries a HARDCODED package list (`PRE_ONLY`), currently empty, so it
- *      is a no-op until someone remembers to add a name. This repo has the scar
- *      that argues against that: the docs-bridge WIRING table was a hardcoded
- *      list, `to-browser-fs` debuted as the 18th store and was never added, and
- *      the bridge threw on TWO releases while both runs reported success. We
- *      DERIVE the list from the filesystem instead.
+ *      is a no-op until someone remembers to add a name. ⚠️ The scar that
+ *      argues against it is noy-db-to's, not this repo's — the header was
+ *      ported and told it as local history: its docs-bridge WIRING table was a
+ *      hardcoded list, `to-browser-fs` debuted as its 18th store and was never
+ *      added, and the bridge threw on TWO releases while both runs reported
+ *      success. The MECHANISM is why we DERIVE the list from the filesystem
+ *      here, and it transfers exactly; only the ownership did not.
+ *      ⭐ It also aged into something sharper: this repo's own inherited
+ *      docs-bridge job was removed on 2026-09-01 for the same shape one level
+ *      up — it referenced scripts that never came across in the extraction and
+ *      was `continue-on-error` at the JOB level, so it would have failed on
+ *      every release while the run reported green. Hardcoded lists and
+ *      non-fatal jobs fail the same way: successfully.
  *
  *   2. It never fails its caller, on the reasoning that a wedged tag is
  *      cosmetic and a red release trains people to stop reading logs. That is
  *      right for a pre-only repoint. It is wrong here: a package left behind
  *      leaves `@next` pointing at something older than `@latest`, which is a
- *      wrong answer to `npm i @noy-db/to-x@next`, not a cosmetic one. This
+ *      wrong answer to `npm i @noy-db/as-x@next`, not a cosmetic one. This
  *      script EXITS NON-ZERO on any failure.
  *
  * ## Usage
@@ -165,9 +173,10 @@ for (const pkg of pkgs) {
 //   r ≈ w for npm calls, so settle is roughly ONE PASS-DURATION for every
 //   package, with a floor of n·r. That scales WITH package count:
 //
-//     52 packages → ~80s     18 (here) → ~27s     3 → ~4.5s
+//     52 packages → ~80s     18 → ~27s     10 (here) → ~15s     3 → ~4.5s
 //
-// So the exposure here is that this repo is EIGHTEEN, not that it is
+// ⚠️ "18 (here)" was noy-db-to's package count, ported. This repo has TEN.
+// So the exposure here is that this repo is TEN, not that it is
 // tail-shaped. An earlier draft of this comment claimed the last-written
 // package gets essentially zero settle; that is false for this design and was
 // reasoning about an ordering nobody had read. It IS true of a

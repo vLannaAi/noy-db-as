@@ -1,21 +1,31 @@
 name: Peer floor
 
-# Does every store actually COMPILE against the oldest @noy-db/hub its peer
+# Does every package actually COMPILE against the oldest @noy-db/hub its peer
 # range admits?
 #
 # Deliberately NOT part of ci.yml. Every gate there — build, lint, typecheck,
-# 1717 tests — runs against the DEV PIN, so all of them stay green no matter how
+# 374 tests — runs against the DEV PIN, so all of them stay green no matter how
 # wrong the declared peer range is. This job is the only one that installs a
 # different hub, which is why it needs the network and its own workflow.
 #
-# It exists because the gap shipped twice:
-#   #89  16 packages advertised ^0.3.0 || ^0.4.0 || ^0.5.0 while importing
-#        symbols that exist only from 0.6.0-pre. The same defect was live on the
-#        0.5.0 stable line and had to be repaired by deprecating 17 versions.
-#   #84  to-drive / to-icloud needed StoreLocator.register() to be generic,
-#        which landed in 0.6.0-pre.11. Symbol presence does NOT catch that —
-#        StoreFactory exists at pre.0, it just cannot accept the argument.
-#        Only compiling against the floor finds it.
+# It exists because the gap shipped twice. ⚠️ BOTH INCIDENTS ARE noy-db-to's —
+# this header was ported verbatim and told them as local history, and it is the
+# THIRD copy of the same text (scripts/check-peer-floor.mjs is the canonical
+# one; release.yml carried a re-pointed fragment of it). Keep them in step, and
+# note that the "17 deprecated versions" figure belongs to noy-db-to's to-*
+# packages — every as-* package is healthy on both rails.
+#
+#   noy-db-to #89  16 packages advertised ^0.3.0 || ^0.4.0 || ^0.5.0 while
+#        importing symbols that exist only from 0.6.0-pre. The same defect was
+#        live on the 0.5.0 stable line and had to be repaired by deprecating
+#        17 to-* versions.
+#   noy-db-to #84  to-drive / to-icloud needed StoreLocator.register() to be
+#        generic, which landed in 0.6.0-pre.11. Symbol presence does NOT catch
+#        that — StoreFactory exists at pre.0, it just cannot accept the
+#        argument. Only compiling against the floor finds it.
+#
+# The MECHANISM is why this job compiles instead of grepping, and it transfers
+# exactly; only the ownership did not.
 #
 # Triggers are scoped to when a range can actually become false. That is NOT
 # only a manifest edit:
@@ -103,5 +113,5 @@ jobs:
       - name: Show the plan
         run: node scripts/check-peer-floor.mjs --dry-run
 
-      - name: Compile every store against its declared floor
+      - name: Compile every package against its declared floor
         run: node scripts/check-peer-floor.mjs

@@ -42,20 +42,20 @@ importers:
         specifier: ^3.0.0
         version: 3.1123.0
       '@noy-db/hub':
-        specifier: 0.7.0-pre.17
-        version: 0.7.0-pre.17
+        specifier: 0.7.0
+        version: 0.7.0
 
   as-blob:
     devDependencies:
       '@noy-db/hub':
-        specifier: 0.7.0-pre.17
-        version: 0.7.0-pre.17
+        specifier: 0.7.0
+        version: 0.7.0
       '@noy-db/test-format-conformance':
-        specifier: 0.7.0-pre.17
-        version: 0.7.0-pre.17(@noy-db/hub@0.7.0-pre.17)(vitest@3.2.7(@types/node@22.20.1)(happy-dom@18.0.1))
+        specifier: 0.7.0
+        version: 0.7.0(@noy-db/hub@0.7.0)(vitest@3.2.7(@types/node@22.20.1)(happy-dom@18.0.1))
       '@noy-db/to-memory':
-        specifier: 0.7.0-pre.17
-        version: 0.7.0-pre.17(@noy-db/hub@0.7.0-pre.17)
+        specifier: 0.7.0
+        version: 0.7.0(@noy-db/hub@0.7.0)
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
@@ -66,11 +66,11 @@ importers:
   as-csv:
     devDependencies:
       '@noy-db/hub':
-        specifier: 0.7.0-pre.17
-        version: 0.7.0-pre.17
+        specifier: 0.7.0
+        version: 0.7.0
       '@noy-db/test-format-conformance':
-        specifier: 0.7.0-pre.17
-        version: 0.7.0-pre.17(@noy-db/hub@0.7.0-pre.17)(vitest@3.2.7(@types/node@22.20.1)(happy-dom@18.0.1))
+        specifier: 0.7.0
+        version: 0.7.0(@noy-db/hub@0.7.0)(vitest@3.2.7(@types/node@22.20.1)(happy-dom@18.0.1))
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
@@ -81,11 +81,11 @@ importers:
   as-json:
     devDependencies:
       '@noy-db/hub':
-        specifier: 0.7.0-pre.17
-        version: 0.7.0-pre.17
+        specifier: 0.7.0
+        version: 0.7.0
       '@noy-db/test-format-conformance':
-        specifier: 0.7.0-pre.17
-        version: 0.7.0-pre.17(@noy-db/hub@0.7.0-pre.17)(vitest@3.2.7(@types/node@22.20.1)(happy-dom@18.0.1))
+        specifier: 0.7.0
+        version: 0.7.0(@noy-db/hub@0.7.0)(vitest@3.2.7(@types/node@22.20.1)(happy-dom@18.0.1))
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
@@ -96,11 +96,11 @@ importers:
   as-ndjson:
     devDependencies:
       '@noy-db/hub':
-        specifier: 0.7.0-pre.17
-        version: 0.7.0-pre.17
+        specifier: 0.7.0
+        version: 0.7.0
       '@noy-db/test-format-conformance':
-        specifier: 0.7.0-pre.17
-        version: 0.7.0-pre.17(@noy-db/hub@0.7.0-pre.17)(vitest@3.2.7(@types/node@22.20.1)(happy-dom@18.0.1))
+        specifier: 0.7.0
+        version: 0.7.0(@noy-db/hub@0.7.0)(vitest@3.2.7(@types/node@22.20.1)(happy-dom@18.0.1))
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
@@ -111,11 +111,11 @@ importers:
   as-noydb:
     devDependencies:
       '@noy-db/hub':
-        specifier: 0.7.0-pre.17
-        version: 0.7.0-pre.17
+        specifier: 0.7.0
+        version: 0.7.0
       '@noy-db/test-format-conformance':
-        specifier: 0.7.0-pre.17
-        version: 0.7.0-pre.17(@noy-db/hub@0.7.0-pre.17)(vitest@3.2.7(@types/node@22.20.1)(happy-dom@18.0.1))
+        specifier: 0.7.0
+        version: 0.7.0(@noy-db/hub@0.7.0)(vitest@3.2.7(@types/node@22.20.1)(happy-dom@18.0.1))
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
@@ -126,11 +126,11 @@ importers:
   as-sql:
     devDependencies:
       '@noy-db/hub':
-        specifier: 0.7.0-pre.17
-        version: 0.7.0-pre.17
+        specifier: 0.7.0
+        version: 0.7.0
       '@noy-db/test-format-conformance':
-        specifier: 0.7.0-pre.17
-        version: 0.7.0-pre.17(@noy-db/hub@0.7.0-pre.17)(vitest@3.2.7(@types/node@22.20.1)(happy-dom@18.0.1))
+        specifier: 0.7.0
+        version: 0.7.0(@noy-db/hub@0.7.0)(vitest@3.2.7(@types/node@22.20.1)(happy-dom@18.0.1))
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
@@ -140,22 +140,22 @@ importers:
 
   as-xlsx:
     dependencies:
-      '@noy-db/as-zip':
-        specifier: ^0.7.0-pre.17
-        version: 0.7.0-pre.17(@noy-db/hub@0.7.0-pre.17)
       fast-xml-parser:
         specifier: ^5.0.0
         version: 5.11.1
     devDependencies:
+      '@noy-db/as-zip':
+        specifier: ^0.7.0
+        version: 0.7.0(@noy-db/hub@0.7.0)
       '@noy-db/hub':
-        specifier: 0.7.0-pre.17
-        version: 0.7.0-pre.17
+        specifier: 0.7.0
+        version: 0.7.0
       '@noy-db/test-format-conformance':
-        specifier: 0.7.0-pre.17
-        version: 0.7.0-pre.17(@noy-db/hub@0.7.0-pre.17)(vitest@3.2.7(@types/node@22.20.1)(happy-dom@18.0.1))
+        specifier: 0.7.0
+        version: 0.7.0(@noy-db/hub@0.7.0)(vitest@3.2.7(@types/node@22.20.1)(happy-dom@18.0.1))
       '@noy-db/to-memory':
-        specifier: 0.7.0-pre.17
-        version: 0.7.0-pre.17(@noy-db/hub@0.7.0-pre.17)
+        specifier: 0.7.0
+        version: 0.7.0(@noy-db/hub@0.7.0)
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
@@ -170,11 +170,11 @@ importers:
         version: 5.11.1
     devDependencies:
       '@noy-db/hub':
-        specifier: 0.7.0-pre.17
-        version: 0.7.0-pre.17
+        specifier: 0.7.0
+        version: 0.7.0
       '@noy-db/test-format-conformance':
-        specifier: 0.7.0-pre.17
-        version: 0.7.0-pre.17(@noy-db/hub@0.7.0-pre.17)(vitest@3.2.7(@types/node@22.20.1)(happy-dom@18.0.1))
+        specifier: 0.7.0
+        version: 0.7.0(@noy-db/hub@0.7.0)(vitest@3.2.7(@types/node@22.20.1)(happy-dom@18.0.1))
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
@@ -185,14 +185,14 @@ importers:
   as-zip:
     devDependencies:
       '@noy-db/hub':
-        specifier: 0.7.0-pre.17
-        version: 0.7.0-pre.17
+        specifier: 0.7.0
+        version: 0.7.0
       '@noy-db/test-format-conformance':
-        specifier: 0.7.0-pre.17
-        version: 0.7.0-pre.17(@noy-db/hub@0.7.0-pre.17)(vitest@3.2.7(@types/node@22.20.1)(happy-dom@18.0.1))
+        specifier: 0.7.0
+        version: 0.7.0(@noy-db/hub@0.7.0)(vitest@3.2.7(@types/node@22.20.1)(happy-dom@18.0.1))
       '@noy-db/to-memory':
-        specifier: 0.7.0-pre.17
-        version: 0.7.0-pre.17(@noy-db/hub@0.7.0-pre.17)
+        specifier: 0.7.0
+        version: 0.7.0(@noy-db/hub@0.7.0)
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
@@ -670,18 +670,18 @@ packages:
   '@nodable/entities@3.0.0':
     resolution: {integrity: sha512-8L9xFeTYKhm49xfIypoe2W5wV1m/3Z58kT+7kR9A8OyFxcPduI4VmxaUMQyKYrRjUoLLSXv6EKKID5Tvj9cUVw==}
 
-  '@noy-db/as-zip@0.7.0-pre.17':
-    resolution: {integrity: sha512-7XzN2z/7lWhRyfkJ2y9qk0bkNCD7PCJUPtIbJArXBFsodcjfnBqDQPcNQJrMIxIhpyu53TwLdKrpfwI9IThHgw==}
+  '@noy-db/as-zip@0.7.0':
+    resolution: {integrity: sha512-m2oIUHIfAMjaQfapUbimLJ6wu57L6cCGrsmdvRXLnJWdyvJtnMtJ1s2I20AViDDGPF2N0IlhQROy6zIq/34fVg==}
     engines: {node: '>=22.0.0'}
     peerDependencies:
-      '@noy-db/hub': ^0.7.0-pre.17
+      '@noy-db/hub': ^0.7.0
 
-  '@noy-db/attestation@0.7.0-pre.17':
-    resolution: {integrity: sha512-GS7c1vkKyNZA2lbAY6TPvyCRZpoaMqH1D5ARtOwg6popW+9q88isx5tsm6YPBfaa8dXV69rR8WyKip/4V5kVbA==}
+  '@noy-db/attestation@0.7.0':
+    resolution: {integrity: sha512-RIs0QXemA7U2y9DGlfD+s5GNRrIdiYA41z/aOFMtItZaQbqWcO5V/CW5mIuDAAO8wT6svakuL3vvgJrYvbT+fw==}
     engines: {node: '>=22.0.0'}
 
-  '@noy-db/hub@0.7.0-pre.17':
-    resolution: {integrity: sha512-R0LOzUkdujHLr4DIeHoPj/AB6Q2Ix7gA1VZwa9tiIH8sPVtksbn8e1ObXpCWcfB1tGE/eRTnddhdZ+7vtBw1AA==}
+  '@noy-db/hub@0.7.0':
+    resolution: {integrity: sha512-Et7O3fdthO2yl6jKJ9OMLTGHXv2G5bskXTrWhP1Z3SvYJ2xwYot2cFm5AO+A4R6ld6JgjOLhXjbfDvpQO7CCVg==}
     engines: {node: '>=22.0.0'}
     peerDependencies:
       zod: ^3.0.0 || ^4.0.0
@@ -692,18 +692,18 @@ packages:
       zod-to-json-schema:
         optional: true
 
-  '@noy-db/test-format-conformance@0.7.0-pre.17':
-    resolution: {integrity: sha512-uHSsHF1r0+FcTWdoWby4A1FvsPzIJNdHisLALKHebVxvoIEhGs508XSOFpJ2Zmaj0e0r/2AmBrm7pdSWyu0BKQ==}
+  '@noy-db/test-format-conformance@0.7.0':
+    resolution: {integrity: sha512-nOsn+lSifssWR+O6vwvNw10l7oBJWS218Npcg13o/Q4ANwUnkJNHVU4pNiS7Z9RH4ZyCeZtCZtvnAoCZ8TfA2A==}
     engines: {node: '>=22.0.0'}
     peerDependencies:
-      '@noy-db/hub': ^0.7.0-pre.17
+      '@noy-db/hub': ^0.7.0
       vitest: ^3.0.0
 
-  '@noy-db/to-memory@0.7.0-pre.17':
-    resolution: {integrity: sha512-g8mxfRuY5krPKj1kaMVP1BCxWjoub50B1HtaGzmNLG66nBUMUkwfH0yQtri11o2BO9r8cRyXIW4WKMllgkQ+zA==}
+  '@noy-db/to-memory@0.7.0':
+    resolution: {integrity: sha512-EZsE3aSZ0tpW4bvD9S0Yc6keMnc4IAIvfEFMybXjP+0raE8H/htrZx6Kn0nRr8DGuc9OfoZ6+Rz1p9bCZk841Q==}
     engines: {node: '>=22.0.0'}
     peerDependencies:
-      '@noy-db/hub': ^0.7.0-pre.17
+      '@noy-db/hub': ^0.7.0
 
   '@rollup/rollup-android-arm-eabi@4.63.1':
     resolution: {integrity: sha512-UZ8sUxPTiHWYX9QNdJedb1kDZSpS1t/VPWBWGSgqHNi9w3Cu6IXvu2mzbhiTiPvtrqgTQJ+zqiAq2iPIPilpaQ==}
@@ -2071,24 +2071,24 @@ snapshots:
 
   '@nodable/entities@3.0.0': {}
 
-  '@noy-db/as-zip@0.7.0-pre.17(@noy-db/hub@0.7.0-pre.17)':
+  '@noy-db/as-zip@0.7.0(@noy-db/hub@0.7.0)':
     dependencies:
-      '@noy-db/hub': 0.7.0-pre.17
+      '@noy-db/hub': 0.7.0
 
-  '@noy-db/attestation@0.7.0-pre.17': {}
+  '@noy-db/attestation@0.7.0': {}
 
-  '@noy-db/hub@0.7.0-pre.17':
+  '@noy-db/hub@0.7.0':
     dependencies:
-      '@noy-db/attestation': 0.7.0-pre.17
+      '@noy-db/attestation': 0.7.0
 
-  '@noy-db/test-format-conformance@0.7.0-pre.17(@noy-db/hub@0.7.0-pre.17)(vitest@3.2.7(@types/node@22.20.1)(happy-dom@18.0.1))':
+  '@noy-db/test-format-conformance@0.7.0(@noy-db/hub@0.7.0)(vitest@3.2.7(@types/node@22.20.1)(happy-dom@18.0.1))':
     dependencies:
-      '@noy-db/hub': 0.7.0-pre.17
+      '@noy-db/hub': 0.7.0
       vitest: 3.2.7(@types/node@22.20.1)(happy-dom@18.0.1)
 
-  '@noy-db/to-memory@0.7.0-pre.17(@noy-db/hub@0.7.0-pre.17)':
+  '@noy-db/to-memory@0.7.0(@noy-db/hub@0.7.0)':
     dependencies:
-      '@noy-db/hub': 0.7.0-pre.17
+      '@noy-db/hub': 0.7.0
 
   '@rollup/rollup-android-arm-eabi@4.63.1':
     optional: true

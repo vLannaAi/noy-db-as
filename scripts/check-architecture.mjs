@@ -14,8 +14,10 @@ function fail(rule, msg, where) {
   console.error(`✗ [${rule}] ${msg}${where ? ` (${relative(ROOT, where)})` : ''}`)
 }
 
-// Stores are flat at the repo root: directories named `as-*` with a package.json.
-function listStoreDirs() {
+// The packages are flat at the repo root: directories named `as-*` with a
+// package.json. (They are export FORMATS, not stores — the ported name
+// `listStoreDirs` inverted this family's defining layer property and is gone.)
+function listPackageDirs() {
   if (!existsSync(ROOT)) return []
   return readdirSync(ROOT)
     .filter(name => name.startsWith('as-'))
@@ -41,7 +43,7 @@ function walkTs(dir, cb) {
 // Rule 1 — hub-peer-range: @noy-db/hub must be a peerDependency at a published
 // RANGE; never in dependencies, never a workspace: specifier.
 function checkHubPeerRange() {
-  for (const dir of listStoreDirs()) {
+  for (const dir of listPackageDirs()) {
     const pj = readPkg(dir)
     const dep = pj.dependencies?.['@noy-db/hub']
     const peer = pj.peerDependencies?.['@noy-db/hub']
@@ -50,13 +52,15 @@ function checkHubPeerRange() {
     if (peer === undefined)
       fail('hub-peer-range', `${pj.name} is missing peerDependencies['@noy-db/hub'].`, dir)
     else if (peer.startsWith('workspace:'))
-      fail('hub-peer-range', `${pj.name} peers @noy-db/hub as "${peer}"; cross-repo stores must use a published range (e.g. "^0.2.0-pre.31").`, dir)
+      fail('hub-peer-range', `${pj.name} peers @noy-db/hub as "${peer}"; a cross-repo package must use a published range (e.g. "^0.7.0").`, dir)
     else if (!/^[\^~]?\d/.test(peer))
       fail('hub-peer-range', `${pj.name} peers @noy-db/hub as "${peer}"; expected a semver range.`, dir)
   }
 }
 
-// Rule 2 — to-only: store src may import @noy-db/hub ONLY via /to.
+// Rule 2 — no-runtime-store-import. (The ported header here still named
+// noy-db-to's `to-only` rule — the very rule the block below explains had to be
+// REPLACED rather than ported. Corrected; the real explanation is inside.)
 // Covers static imports (from/import), dynamic import(), require(), and bare
 // side-effect imports (import '@noy-db/hub').
 const HUB_IMPORT_RE = /(?:from|import|require)\s*\(?\s*['"]@noy-db\/hub(\/[^'"]*)?['"]/g
@@ -80,7 +84,7 @@ function checkNoRuntimeStoreImport() {
   // below, reports the wrong statement, and misses the `type` keyword that is
   // actually there. That produced a false positive on real code.
   const SPEC = "from '@noy-db/hub/to'"
-  for (const dir of listStoreDirs()) {
+  for (const dir of listPackageDirs()) {
     const pj = readPkg(dir)
     walkTs(join(dir, 'src'), (file, code) => {
       let at = code.indexOf(SPEC)
@@ -118,10 +122,10 @@ function checkAsConformanceFixture() {
   // against its source at relocation. Named explicitly rather than skipped by a
   // looser pattern, so a real format package can never ride the exemption.
   const DESTINATIONS = new Set(['as-aws-s3'])
-  // listStoreDirs() yields ABSOLUTE paths, not names — take the basename before
+  // listPackageDirs() yields ABSOLUTE paths, not names — take the basename before
   // comparing against the exemption set or the failure would name a full path
   // and the exemption would never match.
-  for (const dir of listStoreDirs()) {
+  for (const dir of listPackageDirs()) {
     const name = basename(dir)
     if (DESTINATIONS.has(name)) continue
     const testsDir = join(dir, '__tests__')
@@ -142,15 +146,28 @@ function checkAsConformanceFixture() {
 
 checkAsConformanceFixture()
 
-// Rule 3 — no-crypto-deps: zero npm crypto packages (stores see ciphertext only).
+// Rule 3 — no-crypto-deps: zero npm crypto packages.
+//
+// ⚠️ The ported justification was "stores see ciphertext only", which is the
+// EXACT INVERSE of this family's property and is the dangerous direction to
+// get wrong: an `as-*` package sees PLAINTEXT by design, because it runs after
+// decryption. A reader who believed the old sentence could reasonably conclude
+// the rule was about a layer they are not in.
+//
+// The real reason, which is STRONGER here than for a store: all cryptography
+// belongs to @noy-db/hub, inside the trust boundary. A format that carried its
+// own crypto would be operating on decrypted user data OUTSIDE that boundary,
+// with its own primitives and its own bugs. That is exactly what this family
+// exists to prevent, so the one family that sees plaintext is the one that
+// least may bring its own crypto.
 const BANNED = new Set(['crypto-js', 'node-forge', 'tweetnacl', 'bcryptjs', 'bcrypt'])
 function checkNoCryptoDeps() {
-  for (const dir of listStoreDirs()) {
+  for (const dir of listPackageDirs()) {
     const pj = readPkg(dir)
     for (const block of ['dependencies', 'devDependencies', 'peerDependencies']) {
       for (const name of Object.keys(pj[block] ?? {})) {
         if (BANNED.has(name) || name.startsWith('@noble/') || name.startsWith('@scure/'))
-          fail('no-crypto-deps', `${pj.name} depends on crypto package "${name}"; stores see ciphertext only — use @noy-db/hub.`, dir)
+          fail('no-crypto-deps', `${pj.name} depends on crypto package "${name}"; all crypto belongs inside @noy-db/hub's trust boundary — a format runs on PLAINTEXT and must not bring its own.`, dir)
       }
     }
   }

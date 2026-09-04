@@ -13,6 +13,7 @@ guarantee — wiring it to a blob field is a deliberate, per-field opt-in.
 import { asAwsS3 } from '@noy-db/as-aws-s3'
 
 const objects = asAwsS3({ bucket: 'acme-public-assets', region: 'eu-west-1' })
+const bytes = new Uint8Array(await (await fetch('/logo.png')).arrayBuffer())
 
 await objects.putObject('logos/acme.png', bytes, { contentType: 'image/png', public: true })
 objects.publicUrl('logos/acme.png')              // stable CDN/S3 URL

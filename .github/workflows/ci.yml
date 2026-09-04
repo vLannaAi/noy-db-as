@@ -1,14 +1,23 @@
 name: CI
 
-# Standard CI for noy-db-as: the non-essential @noy-db/as-* storage adapters.
+# Standard CI for noy-db-as: the @noy-db/as-* export formats.
+#
+# (Ported header said "the non-essential @noy-db/as-* storage adapters". Both
+# halves were wrong: these are FORMATS, not stores — the prefix is the layer —
+# and "non-essential" was noy-db-to's split, where four essential to-* stores
+# stayed in core. All ten as-* packages came here; none is a remainder.)
 # Multi-package pnpm workspace: check:architecture → install → build → lint → typecheck → test
 # across the runtime-supported Node versions (22 + 24).
 
 on:
   push:
     branches: [main]
+  # NO `branches:` filter on pull_request, deliberately. That key filters on the
+  # PR's BASE branch, so `branches: [main]` silently skips every stacked PR — and
+  # GitHub renders "no checks reported", which reads as pending rather than as
+  # never-ran. Worse here than the bare case: peer-floor.yml has no such filter,
+  # so a stacked PR shows SOME green checks and no CI at all. (lanna-db#12)
   pull_request:
-    branches: [main]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -55,6 +64,23 @@ jobs:
       # obligation did too. Nothing compiles a migration map.
       - name: Codemod rows agree with this repo's source
         run: pnpm check:codemod-rows
+      # These ten packages are ONE lockstep line whose version lives in ten
+      # separate files plus one internal range (as-xlsx -> as-zip, a peer).
+      # An edit that misses one is locally correct and passes every other gate
+      # here; it surfaces only as an ERESOLVE in a consumer's install.
+      #
+      # check:not-already-published is deliberately NOT run here. It is false by
+      # design between releases — main legitimately sits at the last published
+      # version — so running it on every push would make main permanently red,
+      # and a permanently-red check is one people learn to ignore. It gates the
+      # RELEASE instead, which is the only moment its answer decides anything.
+      - name: One version across the line, and every internal range admits it
+        run: pnpm check:versions-uniform
+      # Runs AFTER build on purpose: the blocks compile against each package's
+      # built `dist`, and the check refuses to run against an unbuilt package
+      # rather than passing having resolved every import to `any`.
+      - name: Shipped README examples compile
+        run: pnpm check:prose-examples
       - name: Lint
         run: pnpm lint
       - name: Typecheck

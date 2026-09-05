@@ -31,17 +31,53 @@ function hasTool(name: string): boolean {
  * installed `unar` on macOS ONLY, so its Linux and Windows legs skipped two of
  * three blocks, greenly, for as long as the job existed (noy-db #1331).
  *
- * With NOYDB_INTEROP_REQUIRE=1 a missing tool is a FAILURE naming the tool.
- * Set it wherever the tools are installed on purpose; leave it unset locally.
+ * NOYDB_INTEROP_REQUIRE names the tools that MUST be present: a comma-separated
+ * list (`7z`, `unar`), or `1` for all of them. A named tool that is missing is a
+ * FAILURE naming itself; anything unnamed still skips. Leave it unset locally.
+ *
+ * ⚠️ IT IS A LIST RATHER THAN A BOOLEAN BECAUSE TOOL AVAILABILITY IS NOT UNIFORM,
+ * and that was measured, not assumed — CI run 33944815086, the first honest run
+ * of this file on three OSes:
+ *
+ *   ubuntu   7z  installed, all 4 vectors PASS
+ *            unar installed, all 4 vectors FAIL: "Archive parsing failed!
+ *            (Missing or wrong password.)" — on the same archives macOS's unar
+ *            reads without complaint. Same bytes, same code: the difference is
+ *            the tool, not the writer. Ubuntu's `unar` cannot read WinZip-AES-256.
+ *   macos    7z + unar, all 11 vectors PASS
+ *   windows  `choco install unarchiver` does not exist; there is no unar there.
+ *
+ * ⭐ SO `unar` IS REQUIRED ON macOS ONLY — which is, on its face, the exact shape
+ * that made noy-db's job vacuous. The difference is the whole point: theirs was
+ * an accident nobody had measured, silently checking one block of three while
+ * reporting green. This one is a recorded result with a run id, and `7z` — which
+ * genuinely works everywhere — is required on all three. When Ubuntu ships a
+ * `unar` that reads WinZip-AES, add it to that leg's list and delete this note.
  */
-const REQUIRE_TOOLS = process.env.NOYDB_INTEROP_REQUIRE === '1'
+const REQUIRED = (process.env.NOYDB_INTEROP_REQUIRE ?? '')
+  .split(',')
+  .map((t) => t.trim())
+  .filter(Boolean)
+
+// A name this file does not check is almost certainly a typo, and an unnoticed
+// typo puts the gate straight back where it started: `NOYDB_INTEROP_REQUIRE=7zz`
+// would require nothing at all and pass, silently, forever. Measured: before
+// this guard, `NOYDB_INTEROP_REQUIRE=7z,unar,nosuchtool` reported 11 passed.
+const KNOWN_TOOLS = ['7z', 'unar']
+const unknown = REQUIRED.filter((t) => t !== '1' && !KNOWN_TOOLS.includes(t))
+if (unknown.length > 0) {
+  throw new Error(
+    `NOYDB_INTEROP_REQUIRE names unknown tool(s): ${unknown.join(', ')}. ` +
+      `This file checks only: ${KNOWN_TOOLS.join(', ')}.`,
+  )
+}
 
 function requireOrSkip(tool: string, found: boolean): boolean {
   if (found) return false
-  if (REQUIRE_TOOLS) {
+  if (REQUIRED.includes('1') || REQUIRED.includes(tool)) {
     throw new Error(
-      `NOYDB_INTEROP_REQUIRE=1 but \`${tool}\` is not on PATH. ` +
-        `Install it, or unset the variable to skip these vectors.`,
+      `NOYDB_INTEROP_REQUIRE names \`${tool}\` but it is not on PATH. ` +
+        `Install it, or drop it from the variable to skip these vectors.`,
     )
   }
   return true
@@ -82,7 +118,7 @@ const VECTORS = [
 
 describe('our writer → 7-Zip reader', () => {
   const sevenZip = find7z()
-  const skip = requireOrSkip('7z (or 7zz)', sevenZip !== null)
+  const skip = requireOrSkip('7z', sevenZip !== null)
 
   for (const v of VECTORS) {
     it(
@@ -150,7 +186,7 @@ describe('our writer → unar reader', () => {
 
 describe('7-Zip writer → our reader', () => {
   const sevenZip = find7z()
-  const skip = requireOrSkip('7z (or 7zz)', sevenZip !== null)
+  const skip = requireOrSkip('7z', sevenZip !== null)
 
   // Omit 'nonascii' — path contains a slash, making the entryPath inside
   // the archive OS-dependent when 7z is invoked with cwd.

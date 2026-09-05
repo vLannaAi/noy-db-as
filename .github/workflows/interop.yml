@@ -7,7 +7,7 @@
 # `continue-on-error: true`. noy-db has since dropped its copy (noy-db #1331),
 # so cross-OS archive interop is checked by nobody until this runs.
 #
-# ⚠️ WHY `NOYDB_INTEROP_REQUIRE=1` IS THE WHOLE POINT. The vectors skip
+# ⚠️ WHY `NOYDB_INTEROP_REQUIRE` IS THE WHOLE POINT. The vectors skip
 # gracefully when `7z`/`7zz`/`unar` are absent — right on a developer machine,
 # wrong here. noy-db's job installed `unar` on macOS ONLY, so its Linux and
 # Windows legs silently skipped two of three blocks for as long as it existed:
@@ -70,21 +70,42 @@ jobs:
       - name: Install (frozen lockfile)
         run: pnpm install --frozen-lockfile
 
-      # Both tools on every OS, deliberately. Installing `unar` on macOS only —
-      # as the ported job did — is what made two legs vacuous.
-      - name: Install 7-Zip + unar (Linux)
+      # `7z` on all three; `unar` on macOS only. That is the same SHAPE as the
+      # ported job's macOS-only unar, and the difference is that this one is a
+      # measured result rather than an oversight — run 33944815086, the first
+      # honest run of these vectors on three OSes:
+      #
+      #   ubuntu   unar installs, and every AES vector FAILS with "Archive
+      #            parsing failed! (Missing or wrong password.)" — on archives
+      #            macOS's unar reads fine. Same bytes, same code; Ubuntu's unar
+      #            cannot read WinZip-AES-256.
+      #   windows  `choco install unarchiver` does not exist. There is no unar.
+      #
+      # ⚠️ Do not "fix" this by installing unar on Linux: it will install, run,
+      # and fail. The finding belongs in the record, not in a red gate. When
+      # Ubuntu ships a unar that reads WinZip-AES, add it to that leg.
+      - name: Install 7-Zip (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y p7zip-full unar
+        run: sudo apt-get update && sudo apt-get install -y p7zip-full
       - name: Install 7-Zip + unar (macOS)
         if: runner.os == 'macOS'
         run: brew install sevenzip unar
-      - name: Install 7-Zip + unar (Windows)
+      - name: Install 7-Zip (Windows)
         if: runner.os == 'Windows'
-        run: choco install 7zip unarchiver -y
+        run: choco install 7zip -y
 
-      # Fails, naming the tool, if any of them is missing — see the header.
+      # Printed so the claim above stays checkable as runner images move — the
+      # note says "Ubuntu's unar", and this is what says which one that was.
+      - name: Tool versions
+        shell: bash
+        continue-on-error: true
+        run: |
+          (7z i 2>/dev/null || 7zz i 2>/dev/null) | head -3 || echo "no 7z"
+          unar -v 2>/dev/null | head -2 || echo "unar: not installed on this OS"
+
+      # Fails, naming the tool, if a REQUIRED one is missing — see the header.
       - name: Run interop vectors
         working-directory: as-zip
         env:
-          NOYDB_INTEROP_REQUIRE: '1'
+          NOYDB_INTEROP_REQUIRE: ${{ runner.os == 'macOS' && '7z,unar' || '7z' }}
         run: pnpm vitest run __tests__/interop.test.ts --reporter=verbose

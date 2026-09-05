@@ -42,14 +42,25 @@ Absent the grant → `ExportCapabilityError`.
 ```ts
 import { toBytes } from '@noy-db/as-xlsx'
 
-interface Invoice { id: string; status: string }
+interface Invoice {
+  id: string
+  client: string
+  amount: string
+  status: string
+  issueDate: string
+}
 
 const bytes = await toBytes<Invoice>(vault, {
   sheets: [
     {
       name: 'Invoices',
       collection: 'invoices',
+      // With a type argument, `columns` and `numberFormats` keys are checked
+      // against `Invoice` — a typo is a compile error, not an empty column.
       columns: ['id', 'client', 'amount', 'status', 'issueDate'],
+      // Money is stored as a decimal string; without a format it lands in a
+      // TEXT cell and Excel's SUM() reads it as zero.
+      numberFormats: { amount: '#,##0.00' },
       filter: (r) => r.status !== 'draft',
     },
     { name: 'Payments', collection: 'payments' },

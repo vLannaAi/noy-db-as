@@ -39,6 +39,17 @@ export { inferSchema, zodSourceFor, type InferredSchema, type InferredCollection
 
 /** Per-sheet options for the noy-db consumer API. */
 /**
+ * The column names addressable on a sheet.
+ *
+ * ⚠️ `keyof unknown` is `never`, so writing `readonly (keyof T & string)[]`
+ * directly would type `columns` as `never[]` for every call that does not pass
+ * a type argument — i.e. it would break every existing caller while looking
+ * like a tightening. The conditional keeps `string` in that case and narrows
+ * only when the caller actually said what the record is.
+ */
+export type AsXlsxColumn<T> = [keyof T] extends [never] ? string : keyof T & string
+
+/**
  * One sheet's selection options.
  *
  * `T` is the shape of a decrypted record in this sheet's collection, defaulting
@@ -60,7 +71,7 @@ export interface AsXlsxSheetOptions<T = unknown> {
    * Field list + order. When omitted, columns are inferred from
    * the union of keys across all records (first-record-wins order).
    */
-  readonly columns?: readonly string[]
+  readonly columns?: readonly AsXlsxColumn<T>[]
   /**
    * Optional predicate against each decrypted record. Runs after
    * decryption; doesn't reduce I/O.
@@ -82,12 +93,18 @@ export interface AsXlsxSheetOptions<T = unknown> {
    */
   readonly widths?: ReadonlyArray<number | undefined>
   /**
-   * Smart mode only: per-field Excel number-format codes (e.g.
-   * `{ amount: '#,##0.00' }` for currency). The value is coerced to a number so
-   * the format renders. Money has no introspection signal, so currency
-   * formatting is opt-in here.
+   * Per-field Excel number-format codes (e.g. `{ amount: '#,##0.00' }` for
+   * currency). The value is coerced to a number so the format renders, which is
+   * what makes `SUM()` work: hub stores money as a decimal STRING to avoid
+   * float error, and a string lands in a text cell that Excel sums as zero.
+   * Money carries no introspection signal, so this is opt-in.
+   *
+   * ⚠️ Was smart-mode only until 0.7.1-pre.1, and silently ignored elsewhere —
+   * a declared option that did nothing on the default path (#8). It now applies
+   * in every mode, through one shared helper, so the two paths cannot drift
+   * again.
    */
-  readonly numberFormats?: Record<string, string>
+  readonly numberFormats?: Partial<Record<AsXlsxColumn<T>, string>>
   /**
    * Smart mode only: per-field explicit dropdown value lists. Overrides the
    * auto-detected enum/ref dropdown for that field.
@@ -279,11 +296,16 @@ export async function toBytes<T = unknown>(vault: Vault, options: AsXlsxOptions<
       records.push(r)
     }
     const projected = projectRecords(vault, sheetOpt.collection, records, options.redact)
-    const columns = sheetOpt.columns ?? inferColumns(projected)
+    // Widened to `string[]` here on purpose. `AsXlsxColumn<T>` narrows the
+    // CALLER's surface; inside the function T is opaque, and `inferColumns`
+    // legitimately returns keys nobody declared. At runtime every key is a
+    // string, so the widening is where that fact is stated once.
+    const columns: readonly string[] = sheetOpt.columns ?? inferColumns(projected)
+    const fmts = sheetOpt.numberFormats as Partial<Record<string, string>> | undefined
     materialisedSheets.push({
       name: sheetOpt.name,
-      header: columns,
-      rows: projected.map((r) => columns.map((c) => r[c] ?? null)),
+      header: [...columns],
+      rows: projected.map((r) => columns.map((c) => numberFormatted(r[c] ?? null, fmts?.[c]))),
       ...(sheetOpt.widths !== undefined ? { widths: sheetOpt.widths } : {}),
     })
   }
@@ -541,6 +563,26 @@ function projectRecords(
 }
 
 /**
+ * Apply a number format to one cell value.
+ *
+ * ⚠️ THE COERCION IS THE POINT, not the style. Hub stores money as a decimal
+ * STRING (to avoid binary-float error), so without this the value reaches
+ * `cellXml` as a string, is interned into the shared-string table, and Excel
+ * renders a TEXT cell — which `SUM()` counts as zero. The format code alone
+ * would not fix that; a text cell with a currency format is still text.
+ *
+ * A value that does not parse as finite is passed through untouched rather than
+ * becoming `NaN`: a column with one malformed row should lose that row's
+ * formatting, not its contents.
+ */
+function numberFormatted(raw: unknown, fmt: string | undefined): unknown {
+  if (fmt === undefined) return raw
+  const num =
+    typeof raw === 'string' && raw.trim() !== '' && Number.isFinite(Number(raw)) ? Number(raw) : raw
+  return styled(num as string | number | boolean | null, fmt)
+}
+
+/**
  * Build a flat {@link XlsxSheet} from pre-filtered records.
  * Used by both {@link toBytes} (via its own inline path) and
  * {@link toBytesMultiVault}.
@@ -549,11 +591,12 @@ function buildFlatSheet(
   name: string,
   columns: readonly string[],
   records: readonly Record<string, unknown>[],
+  numberFormats?: Partial<Record<string, string>>,
 ): XlsxSheet {
   return {
     name,
     header: [...columns],
-    rows: records.map((r) => columns.map((c) => r[c] ?? null)),
+    rows: records.map((r) => columns.map((c) => numberFormatted(r[c] ?? null, numberFormats?.[c]))),
   }
 }
 
@@ -701,10 +744,7 @@ async function buildSmartSheets<T = unknown>(
       const rowNum = i + 2 // header is row 1
       const baseCells = baseCols.map((c) => {
         const raw = c === 'id' ? (r.id ?? null) : (r[c] ?? null)
-        const fmt = m.opt.numberFormats?.[c]
-        if (fmt === undefined) return raw
-        const num = typeof raw === 'string' && raw.trim() !== '' && Number.isFinite(Number(raw)) ? Number(raw) : raw
-        return styled(num as string | number | boolean | null, fmt)
+        return numberFormatted(raw, (m.opt.numberFormats as Partial<Record<string, string>> | undefined)?.[c])
       })
       const i18nCells = m.i18nFields.flatMap((f) => {
         const rawMap = (r[f] && typeof r[f] === 'object' ? r[f] : {}) as Record<string, unknown>

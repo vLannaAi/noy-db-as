@@ -11,7 +11,42 @@ which is the opposite of hub's situation.
 
 ## Unreleased
 
-Nothing yet.
+### Published surface
+
+- ⚠️ **`numberFormats` now applies in every mode, not only smart mode**
+  (noy-db-as#8). It was declared on the sheet options and silently ignored on
+  the default `toBytes` path — a documented option that did nothing where most
+  callers are. The consequence was user-visible and quiet: hub stores money as a
+  decimal **string** to avoid float error, so an unformatted amount reached a
+  TEXT cell and Excel's `SUM()` counted it as **zero**. Both paths now go
+  through one helper, so they cannot drift apart again. A value that does not
+  parse as finite is passed through untouched rather than becoming `NaN`.
+
+- **`columns` and `numberFormats` keys are checked against `T`**
+  (noy-db-as#9). With a type argument, a mistyped column is a compile error
+  instead of a silently empty column:
+
+  ```ts
+  await toBytes<Invoice>(vault, { sheets: [{ …, columns: ['id', 'amonut'] }] })
+  //                                                            ^ Type '"amonut"' is not
+  //                                                              assignable. Did you mean '"amount"'?
+  ```
+
+  Non-breaking: `keyof unknown` is `never`, so typing these as `keyof T`
+  directly would have made `columns` `never[]` for every call without a type
+  argument — a tightening that broke every existing caller. The declared type
+  keeps `string` in that case and narrows only when the caller said what the
+  record is.
+
+  Inline-arrow inference on `filter` is unchanged and still needs the explicit
+  type argument. That is the cost of `T` defaulting to `unknown`, which is what
+  keeps existing calls compiling.
+
+- **`repository.url` points at this repo.** The published `0.7.0` still carried
+  the pre-extraction `vLannaAi/noy-db`, and a consumer binding through public
+  npm has no other pointer — which is how both issues above were first filed
+  against the wrong repository. Corrected in git since the extraction; this is
+  the first release to carry it.
 
 ## 0.7.1-pre.0
 

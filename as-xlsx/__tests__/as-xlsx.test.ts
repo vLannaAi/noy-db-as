@@ -16,7 +16,7 @@
 import { describe, expect, it } from 'vitest'
 import { ExportCapabilityError, createNoydb } from '@noy-db/hub'
 import { toMemory } from '@noy-db/to-memory'
-import { toBytes, write, colLetter, writeXlsx } from '../src/index.js'
+import { toBytes, write, colLetter, writeXlsx, readXlsx } from '../src/index.js'
 import { withTeam } from '@noy-db/hub/team'
 
 interface Invoice { id: string; client: string; amount: number; paid: boolean; date: string }
@@ -351,5 +351,65 @@ describe('as-xlsx — vault integration', () => {
       await rm(dir, { recursive: true, force: true })
       await db.close()
     }
+  })
+})
+
+// ── #8: numberFormats in FLAT mode ─────────────────────────────────────
+//
+// Was smart-mode only and silently ignored elsewhere. Hub stores money as a
+// decimal STRING, so without the coercion the value reaches a TEXT cell and
+// Excel's SUM() counts it as zero — the user-visible symptom in the report.
+// Asserted through readXlsx rather than raw XML: the claim is about the value
+// a spreadsheet sees, not about the markup that carries it.
+describe('#8 — numberFormats applies outside smart mode', () => {
+  async function moneyVault() {
+    const { adapter } = await seedVault()
+    await grantXlsx(adapter)
+    const db = await createNoydb({ teamStrategy: withTeam(), store: adapter, user: 'owner-01', secret: 'owner-pass' })
+    const vault = await db.openVault('acme')
+    await vault.collection('money').put('a', { id: 'a', amount: '1234.56' })
+    await vault.collection('money').put('b', { id: 'b', amount: 'n/a' })
+    return { db, vault }
+  }
+
+  it('coerces a money string to a numeric cell on the flat path', async () => {
+    const { db, vault } = await moneyVault()
+    const bytes = await toBytes(vault, {
+      sheets: [
+        { name: 'M', collection: 'money', columns: ['id', 'amount'], numberFormats: { amount: '#,##0.00' } },
+      ],
+    })
+    // `readXlsx` rows are objects keyed by COLUMN LETTER, not arrays.
+    const rows = (await readXlsx(bytes)).sheets[0].rows
+    const byId = new Map(rows.slice(1).map((r) => [r.A, r.B]))
+    expect(byId.get('a')).toBe(1234.56)
+    expect(typeof byId.get('a')).toBe('number')
+    await db.close()
+  })
+
+  it('passes a non-numeric value through rather than emitting NaN', async () => {
+    const { db, vault } = await moneyVault()
+    const bytes = await toBytes(vault, {
+      sheets: [
+        { name: 'M', collection: 'money', columns: ['id', 'amount'], numberFormats: { amount: '#,##0.00' } },
+      ],
+    })
+    // `readXlsx` rows are objects keyed by COLUMN LETTER, not arrays.
+    const rows = (await readXlsx(bytes)).sheets[0].rows
+    const byId = new Map(rows.slice(1).map((r) => [r.A, r.B]))
+    expect(byId.get('b')).toBe('n/a')
+    await db.close()
+  })
+
+  it('leaves an unformatted column as the stored string', async () => {
+    const { db, vault } = await moneyVault()
+    const bytes = await toBytes(vault, {
+      sheets: [{ name: 'M', collection: 'money', columns: ['id', 'amount'] }],
+    })
+    // `readXlsx` rows are objects keyed by COLUMN LETTER, not arrays.
+    const rows = (await readXlsx(bytes)).sheets[0].rows
+    const byId = new Map(rows.slice(1).map((r) => [r.A, r.B]))
+    expect(byId.get('a')).toBe('1234.56')
+    await db.close()
   })
 })

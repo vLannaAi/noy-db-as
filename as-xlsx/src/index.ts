@@ -38,7 +38,17 @@ export { readXlsx, type ReadXlsxResult, type ReadXlsxSheet, type ReadXlsxRow } f
 export { inferSchema, zodSourceFor, type InferredSchema, type InferredCollection, type InferredField, type InferredType } from './infer.js'
 
 /** Per-sheet options for the noy-db consumer API. */
-export interface AsXlsxSheetOptions {
+/**
+ * One sheet's selection options.
+ *
+ * `T` is the shape of a decrypted record in this sheet's collection, defaulting
+ * to `unknown` so existing calls compile unchanged. Note that `AsXlsxOptions`
+ * threads a SINGLE `T` across every sheet: a workbook mixing collections with
+ * different record shapes still gets `unknown` unless the shapes are unioned.
+ * Per-sheet inference would need the sheet list to be a tuple, which costs more
+ * in call-site noise than it buys.
+ */
+export interface AsXlsxSheetOptions<T = unknown> {
   /**
    * Sheet tab name. Excel caps at 31 chars; longer names are
    * truncated with `…`. Duplicates are suffixed `(2)`, `(3)`.
@@ -55,7 +65,7 @@ export interface AsXlsxSheetOptions {
    * Optional predicate against each decrypted record. Runs after
    * decryption; doesn't reduce I/O.
    */
-  readonly filter?: (record: unknown) => boolean
+  readonly filter?: (record: T) => boolean
   /**
    * Optional per-column character widths (Excel `wch` units). When set,
    * the emitted sheet opens with the requested column widths instead of
@@ -165,9 +175,9 @@ export interface AsXlsxSummarySpec {
 }
 
 /** Single-collection convenience — passed where a sheet-list is accepted. */
-export interface AsXlsxOptions {
+export interface AsXlsxOptions<T = unknown> {
   /** One or more sheets. At least one required. */
-  readonly sheets: readonly AsXlsxSheetOptions[]
+  readonly sheets: readonly AsXlsxSheetOptions<T>[]
   /** Smart mode only: groupBy summary sheets (live SUMIFS/COUNTIFS/AVERAGEIFS). */
   readonly summaries?: readonly AsXlsxSummarySpec[]
   /**
@@ -214,13 +224,13 @@ export interface AsXlsxOptions {
 }
 
 /** Options for `download()` — adds optional filename. */
-export interface AsXlsxDownloadOptions extends AsXlsxOptions {
+export interface AsXlsxDownloadOptions<T = unknown> extends AsXlsxOptions<T> {
   /** Filename offered to the browser. Default `'export.xlsx'`. */
   readonly filename?: string
 }
 
 /** Options for `write()` — requires explicit risk acknowledgement. */
-export interface AsXlsxWriteOptions extends AsXlsxOptions {
+export interface AsXlsxWriteOptions<T = unknown> extends AsXlsxOptions<T> {
   /** Tier 3 egress — see `docs/patterns/as-exports.md`. */
   readonly acknowledgeRisks: true
 }
@@ -242,7 +252,7 @@ export async function toBytesFromCollection(
  * Build the `.xlsx` byte stream from one or more sheets. Pure
  * beyond the auth check + store reads.
  */
-export async function toBytes(vault: Vault, options: AsXlsxOptions): Promise<Uint8Array> {
+export async function toBytes<T = unknown>(vault: Vault, options: AsXlsxOptions<T>): Promise<Uint8Array> {
   vault.assertCanExport('plaintext', 'xlsx')
 
   if (options.sheets.length === 0) {
@@ -262,7 +272,10 @@ export async function toBytes(vault: Vault, options: AsXlsxOptions): Promise<Uin
     const records: Record<string, unknown>[] = []
     for (const item of list) {
       const r = item as Record<string, unknown>
-      if (sheetOpt.filter && !sheetOpt.filter(r)) continue
+      // See the note on AsXlsxSheetOptions: `T` is the caller's assertion about
+      // the record shape, unverifiable at runtime — the same contract
+      // `vault.collection<T>()` already makes. This is the only such cast.
+      if (sheetOpt.filter && !sheetOpt.filter(r as T)) continue
       records.push(r)
     }
     const projected = projectRecords(vault, sheetOpt.collection, records, options.redact)
@@ -282,7 +295,7 @@ export async function toBytes(vault: Vault, options: AsXlsxOptions): Promise<Uin
  * Browser download. Requires a browser-like environment with
  * `URL.createObjectURL` + `document.createElement`.
  */
-export async function download(vault: Vault, options: AsXlsxDownloadOptions): Promise<void> {
+export async function download<T = unknown>(vault: Vault, options: AsXlsxDownloadOptions<T>): Promise<void> {
   const bytes = await toBytes(vault, options)
   const filename = options.filename ?? 'export.xlsx'
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -301,10 +314,10 @@ export async function download(vault: Vault, options: AsXlsxDownloadOptions): Pr
  * Node file-write. Requires `acknowledgeRisks: true` because the
  * plaintext xlsx persists past the process (Tier 3 egress).
  */
-export async function write(
+export async function write<T = unknown>(
   vault: Vault,
   path: string,
-  options: AsXlsxWriteOptions,
+  options: AsXlsxWriteOptions<T>,
 ): Promise<void> {
   if (options.acknowledgeRisks !== true) {
     throw new Error(
@@ -568,16 +581,19 @@ function asCached(v: unknown): string | number | boolean {
  * with a display column driven live by a global `LANG` named range on a
  * `_settings` sheet. Refs auto-detected from `vault.dumpSchema()`.
  */
-async function buildSmartSheets(
+async function buildSmartSheets<T = unknown>(
   vault: Vault,
-  options: AsXlsxOptions,
+  options: AsXlsxOptions<T>,
 ): Promise<{ sheets: XlsxSheet[]; definedNames: { name: string; ref: string }[] }> {
   const snapshot = await vault.dumpSchema()
   const sheetNameByCollection = new Map<string, string>()
   for (const s of options.sheets) sheetNameByCollection.set(s.collection, s.name)
 
   interface Mat {
-    opt: AsXlsxSheetOptions
+    // `AsXlsxSheetOptions<T>`, not `<unknown>`: `filter` is contravariant in T,
+    // so the narrower form is NOT assignable to the wider one. Nothing here
+    // reads `filter` — but typing it `<unknown>` would still reject the assign.
+    opt: AsXlsxSheetOptions<T>
     records: Record<string, unknown>[]
     cols: string[]
     labelMap: Map<string, unknown>
@@ -592,7 +608,8 @@ async function buildSmartSheets(
     const records: Record<string, unknown>[] = []
     for (const item of list) {
       const r = item as Record<string, unknown>
-      if (sheetOpt.filter && !sheetOpt.filter(r)) continue
+      // Same caller-asserted shape as in `toBytes` — see AsXlsxSheetOptions.
+      if (sheetOpt.filter && !sheetOpt.filter(r as T)) continue
       records.push(r)
     }
     const projected = projectRecords(vault, sheetOpt.collection, records, options.redact)

@@ -216,6 +216,22 @@ jobs:
     with:
       ref: ${{ github.event.release.tag_name || github.ref }}
 
+  # Cross-tool archive interop, all three OSes. Same `ref` reasoning as
+  # peer-floor: without it the called workflow checks out the default branch and
+  # gates `main` instead of the tag being published.
+  #
+  # ⚠️ A BLOCKING gate, unlike the noy-db job it replaces. That one was
+  # `continue-on-error: true`, so when the extraction left its `cd
+  # packages/as-zip` pointing at nothing, the failure was advisory and went
+  # unnoticed across a whole release. Non-fatal and invisible are the same
+  # setting.
+  interop:
+    name: Interop
+    if: github.event_name == 'release' || github.event.inputs.confirm == 'PUBLISH' || github.event_name == 'push'
+    uses: ./.github/workflows/interop.yml
+    with:
+      ref: ${{ github.event.release.tag_name || github.ref }}
+
   # ── Gate 2: publish with provenance ──────────────────────────────────
   #
   # Explicit event guard: publish only runs on:
@@ -228,7 +244,7 @@ jobs:
   # could auto-publish to npm without explicit confirmation.
   publish:
     name: Publish to npm
-    needs: [verify, peer-floor]
+    needs: [verify, peer-floor, interop]
     if: |
       github.event_name == 'release' ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.confirm == 'PUBLISH')

@@ -1,0 +1,90 @@
+# Cross-tool archive interop for `as-zip`, on all three runner OSes.
+#
+# WHY THIS EXISTS HERE. noy-db's release workflow ran this, from
+# `packages/as-zip`, and that path left core with the `as-*` extraction on
+# 2026-09-01. Its v0.7.0 tag predated the extraction, so the first run that
+# could fail was v0.7.1-pre.0 — which did, advisorily, because the job was
+# `continue-on-error: true`. noy-db has since dropped its copy (noy-db #1331),
+# so cross-OS archive interop is checked by nobody until this runs.
+#
+# ⚠️ WHY `NOYDB_INTEROP_REQUIRE=1` IS THE WHOLE POINT. The vectors skip
+# gracefully when `7z`/`7zz`/`unar` are absent — right on a developer machine,
+# wrong here. noy-db's job installed `unar` on macOS ONLY, so its Linux and
+# Windows legs silently skipped two of three blocks for as long as it existed:
+# a 3-OS matrix that was green while checking a third of what it claimed.
+# With the flag set, a missing tool FAILS and names itself. Porting the job
+# without the flag would port that hole with it.
+#
+# ⚠️ NOT `continue-on-error`. noy-db's was advisory, which is why its failure
+# went unnoticed for two days. Non-fatal and invisible are the same setting.
+name: Interop
+
+on:
+  pull_request:
+    paths: ['as-zip/**', '.github/workflows/interop.yml']
+  push:
+    branches: [main]
+    paths: ['as-zip/**', '.github/workflows/interop.yml']
+  workflow_call:
+    inputs:
+      ref:
+        description: 'Ref to check out — the release TAG, not the default branch'
+        required: false
+        type: string
+  workflow_dispatch:
+
+concurrency:
+  group: interop-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  interop:
+    name: Archive interop (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - name: Enable corepack (pnpm)
+        run: corepack enable
+      - name: Get pnpm store path
+        id: pnpm-store
+        shell: bash
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v5
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      # Both tools on every OS, deliberately. Installing `unar` on macOS only —
+      # as the ported job did — is what made two legs vacuous.
+      - name: Install 7-Zip + unar (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y p7zip-full unar
+      - name: Install 7-Zip + unar (macOS)
+        if: runner.os == 'macOS'
+        run: brew install sevenzip unar
+      - name: Install 7-Zip + unar (Windows)
+        if: runner.os == 'Windows'
+        run: choco install 7zip unarchiver -y
+
+      # Fails, naming the tool, if any of them is missing — see the header.
+      - name: Run interop vectors
+        working-directory: as-zip
+        env:
+          NOYDB_INTEROP_REQUIRE: '1'
+        run: pnpm vitest run __tests__/interop.test.ts --reporter=verbose

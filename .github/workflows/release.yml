@@ -195,6 +195,42 @@ jobs:
           fi
           echo "✅ routing check passed (version=$VERSION, prerelease=${{ github.event.release.prerelease }})"
 
+      # ⛔ BUILD THE PAYLOAD BEFORE PUBLISHING, NOT AFTER.
+      #
+      # The `docs-bridge` job below needs the release to exist, so it runs after
+      # `publish`. That ordering is unavoidable for the UPLOAD — and it means a
+      # payload that cannot be BUILT would be discovered with npm already
+      # published and the GitHub release already created: a release in the
+      # walk's range carrying no asset, which hard-stops the sync run for every
+      # partition, and an npm publish that cannot be taken back.
+      #
+      # So the build and its validation run here, where failing costs nothing.
+      # Only the upload is left downstream.
+      #
+      # ⚠️ This is the same shape this repo has already paid for once: the
+      # version-vs-tag gate that compared the string "undefined" to the tag was
+      # correct-looking and unreachable until the first cut. A step that can
+      # only fail during a release is a step nobody has run.
+      #
+      # ⚠️ The tag is DERIVED from the version on non-release triggers, not read
+      # from `github.ref_name`. `verify` also runs on push to main (so workflow
+      # edits get tested), where ref_name is `main` — and the builder asserts
+      # `tag === 'v' + version`, so passing the ref would fail this step on
+      # every such push for a reason that has nothing to do with the payload.
+      # On a release the two are the same string, and the release's own tag is
+      # already checked against the version by the routing gate above.
+      - name: Doc-sync payload builds and validates (pre-flight)
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./as-json/package.json').version")
+          node scripts/docs-bridge/build-payload.mjs \
+            --tag "v$VERSION" --channel preflight --run-url preflight > /tmp/preflight.json
+          node -e "
+            const p = require('/tmp/preflight.json');
+            console.log('payload builds: ' + p.packages.length + ' packages at ' + p.version +
+              ', changelog ' + (p.changelog ? p.changelog.length + ' chars' : 'ABSENT'));
+          "
+
   # ── Gate 1b: the declared peer range is TRUE at its floor ────────────
   #
   # `verify` above proves nothing about the peer range: every one of its gates

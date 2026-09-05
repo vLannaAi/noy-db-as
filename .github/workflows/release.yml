@@ -477,9 +477,94 @@ jobs:
   # vLannaAi/noy-db-docs. This repo's own GITHUB_TOKEN cannot write there.
   # When it is absent the step fails LOUDLY rather than skipping, because a
   # bridge that quietly does nothing is the exact failure this job replaced.
+  # ── The doc-sync payload ─────────────────────────────────────────────
+  #
+  # Uploads `docs-bridge.json` as a release asset. noy-db-docs' range walk reads
+  # it instead of a hand-read issue (spec: noy-db-docs
+  # docs/superpowers/specs/2026-09-05-as-on-at-doc-sync-sources-design.md,
+  # ruled lanna-db#17).
+  #
+  # ⛔ NOT `continue-on-error`, and that is the opposite of notify-docs below.
+  # From the moment docs makes this repo a partition source, a release of ours
+  # in range with NO asset is a `BridgeAssetMissingError` that exits the whole
+  # sync run — every partition, not just `as`. The operator's only recovery is
+  # `--skip-tag noy-db-as@<tag>` named in a commit. A silent failure here is
+  # therefore someone else's outage, so it fails loudly and visibly.
+  #
+  # ⚠️ `--clobber` on purpose: the upload must be idempotent across re-runs of a
+  # release, and a half-uploaded asset is indistinguishable from a missing one.
+  docs-bridge:
+    name: Doc-sync payload
+    needs: publish
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Build the payload
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          CHANNEL: ${{ needs.publish.outputs.dist_tag }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          node scripts/docs-bridge/build-payload.mjs \
+            --tag "$TAG" --channel "$CHANNEL" --run-url "$RUN_URL" > /tmp/docs-bridge.json
+
+      # Repeated here even though build-payload.mjs asserts the same thing
+      # before printing. The builder's copy protects a hand run; this one
+      # protects against the file being replaced or truncated between the two
+      # steps, and it is the check the spec names.
+      - name: Validate before upload
+        run: |
+          set -euo pipefail
+          node -e "
+            const p = require('/tmp/docs-bridge.json');
+            const bad = [];
+            if (p.bridge !== 1) bad.push('bridge is ' + p.bridge);
+            if (p.repo !== 'vLannaAi/noy-db-as') bad.push('repo is ' + p.repo);
+            if (!Array.isArray(p.packages) || !p.packages.length) bad.push('packages is empty');
+            if (p.tag !== 'v' + p.version) bad.push('tag ' + p.tag + ' != v' + p.version);
+            if (bad.length) { console.error('payload not uploadable: ' + bad.join('; ')); process.exit(1); }
+            console.log('payload ok: ' + p.packages.length + ' packages at ' + p.version +
+              ', changelog ' + (p.changelog ? p.changelog.length + ' chars' : 'ABSENT'));
+          "
+          # A null changelog is valid to the consumer and useless to a reader:
+          # the plan would show versions and no reason for them. Warn loudly
+          # rather than fail — the release itself is not wrong.
+          node -e "
+            const p = require('/tmp/docs-bridge.json');
+            if (p.changelog === null) {
+              console.log('::warning::docs-bridge.json carries no changelog — CHANGELOG.md has no \`## ' +
+                p.version + '\` section. The docs plan will show this release with no prose.');
+            }
+          "
+
+      - name: Upload as a release asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" /tmp/docs-bridge.json --clobber
+
+      - name: Summary
+        run: |
+          echo "### Doc-sync payload" >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          head -c 2000 /tmp/docs-bridge.json >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
   notify-docs:
     name: Notify noy-db-docs
-    needs: publish
+    needs: [publish, docs-bridge]
     if: github.event_name == 'release'
     runs-on: ubuntu-latest
     continue-on-error: true
@@ -497,10 +582,17 @@ jobs:
         run: |
           set -euo pipefail
 
+          # ⚠️ NO LONGER FATAL. The docs-bridge job above is now the record:
+          # the release carries a `docs-bridge.json` asset that noy-db-docs'
+          # range walk reads. This issue is the INTERIM second channel, kept
+          # only until docs seeds this repo as a partition source (spec §5.3) —
+          # at which point two records would disagree with the manifest and this
+          # job retires. Failing the release over a missing token for a channel
+          # that is already redundant would be the tail wagging the dog.
           if [ -z "${GH_TOKEN:-}" ]; then
-            echo "::error::DOCS_SYNC_TOKEN is not set — noy-db-docs was NOT notified of this publish."
-            echo "::error::Add a fine-grained PAT with Issues:write on vLannaAi/noy-db-docs, or file the doc-sync by hand."
-            exit 1
+            echo "::warning::DOCS_SYNC_TOKEN is not set — no doc-sync issue was filed."
+            echo "::warning::The docs-bridge.json asset on this release is the authoritative record."
+            exit 0
           fi
 
           # The package list is the payload. Assert a COUNT rather than
@@ -547,9 +639,9 @@ jobs:
             echo ""
             echo "Run the doc-sync against these versions and update the pins."
             echo ""
-            echo "There is no \`docs-bridge.json\` asset for this producer, by design — the payload"
-            echo "builder is \`to-*\`-scoped, so **the list above is the delta**. Do not wait for an"
-            echo "asset that will never arrive, and do not read its absence as nothing having shipped."
+            echo "This release carries a \`docs-bridge.json\` asset — read that, not this issue, which"
+            echo "is an interim second channel and retires once docs seeds \`noy-db-as\` as a partition"
+            echo "source (lanna-db#17 §5.3). If the two ever disagree, the asset is authoritative."
             echo ""
             echo "Release: $RELEASE_URL"
           } > /tmp/doc-sync.md

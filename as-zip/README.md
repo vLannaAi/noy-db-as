@@ -26,11 +26,14 @@ const archive = await toBytes(vault, {
 The output is still a valid single-disk ZIP. 7-Zip prompts for the
 password on extract, verified on Linux, macOS and Windows.
 
-⚠️ **Known exception:** `unar` as shipped by Ubuntu (checked
-2026-09-05) fails with *"Missing or wrong password"* on these
-archives. A newer `unar` (Homebrew) reads them fine, as does 7-Zip
-on every platform, so this is a limitation of that build rather
-than of the archive. Read back via:
+⚠️ **Known exception:** some distro-packaged `unar` builds cannot
+read WinZip-AES-256 — measured on `ubuntu-latest`, 2026-09-05,
+[run 33944815086][interop-run], where every vector failed with
+*"Missing or wrong password"*. macOS's `unar` reads the identical
+bytes, as does 7-Zip on every platform, so the limit is in that
+build rather than in the archive. Read back via:
+
+[interop-run]: https://github.com/vLannaAi/noy-db-as/actions/runs/33944815086
 
 ```ts
 import { fromBytes } from '@noy-db/as-zip'

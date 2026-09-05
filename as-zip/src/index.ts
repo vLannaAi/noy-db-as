@@ -102,12 +102,13 @@ export interface AsZipOptions<T = unknown> {
    * Windows, and against `unar` on macOS, by a blocking CI job that
    * `publish` depends on.
    *
-   * ⚠️ `unar` as shipped by Ubuntu (checked 2026-09-05) CANNOT read
-   * these archives — it reports "Missing or wrong password". The
-   * identical bytes open under a newer `unar` and under 7-Zip on
-   * every platform, so this is that build's limitation rather than
-   * the archive's, but a recipient on Ubuntu reaching for their
-   * distro's tool will not get in.
+   * ⚠️ Some distro-packaged `unar` builds CANNOT read these archives:
+   * measured on `ubuntu-latest`, 2026-09-05, CI run 33944815086,
+   * where every vector failed with "Missing or wrong password". The
+   * identical bytes open under macOS's `unar` and under 7-Zip on
+   * every platform, so the limit is in that build rather than in the
+   * archive — but a recipient reaching for their distro's `unar` may
+   * not get in.
    *
    * **Security framing:** this is the *interop* layer for
    * cross-platform handoff to archive tools, not the *encryption*

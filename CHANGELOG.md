@@ -11,36 +11,98 @@ which is the opposite of hub's situation.
 
 ## Unreleased
 
-Nothing yet. The line sits at `0.7.0`, which the registry already carries, so
-`pnpm check:not-already-published` will refuse a release until it is bumped.
+Nothing yet.
+
+## 0.7.1-pre.0
+
+First release cut from this repository. `0.7.0` was published by **noy-db**,
+before the `as-*` families were removed from it on 2026-09-01 — so this line's
+history starts in another repo, and this is the handover.
+
+### Published surface
+
+- **`filter` is now generic** on `as-zip` and `as-xlsx`. It was
+  `(record: unknown) => boolean` with no type parameter to supply, so
+  `filter: (r) => r.status === 'paid'` compiled for nobody — and because a
+  callback in property position is contravariant in its parameter, a consumer
+  could not annotate their way out either. `T` defaults to `unknown`, so every
+  existing call is unchanged:
+
+  ```ts
+  await toBytes<Invoice>(vault, { records: { collection: 'invoices', filter: (r) => r.status === 'paid' } })
+  ```
+
+  The type argument is an assertion, not a proof — records arrive as plain
+  objects and nothing verifies the shape at runtime. That is the contract
+  `vault.collection<T>()` already makes.
+
+- ⚠️ **`@noy-db/as-zip` is now a PEER dependency of `@noy-db/as-xlsx`**, not a
+  plain dependency (lanna-db#16). It is still installed automatically — peers
+  are auto-installed by default in both npm and pnpm — so `as-xlsx` keeps
+  working with no change. **But it is no longer YOUR dependency:** under an
+  isolated `node_modules` layout (pnpm's default) you can no longer
+  `import '@noy-db/as-zip'` unless you depend on it directly. If you use
+  `as-zip`'s API yourself, add it to your own dependencies. Measured under both
+  managers rather than inferred; under npm's hoisted layout it still resolves.
+
+- **The `@noy-db/hub` peer range is widened to `^0.7.0 || ^0.7.1-pre.0`** in all
+  ten packages, so they resolve against core's current prerelease line. Widened
+  by appending; nothing that resolved before stops resolving.
+
+### Documentation corrections, all found by compiling the prose
+
+- `as-zip`'s README taught `asZip.toBytes(vault, …)` in two examples. **There is
+  no such export** — the package exports `toBytes`, `fromBytes`, `download`,
+  `write`. Shipped in the published `0.7.0` tarball; a consumer copying either
+  block got an undefined reference.
+- `as-xlsx` and `as-zip` `db.grant()` examples omitted the required
+  `displayName`.
+- Undefined placeholder identifiers in `as-aws-s3`, `as-csv` and `as-zip`
+  examples.
+- A `manifest.json` illustration was fenced as ```` ```ts ````. `tsc` skips
+  semantic checking for the whole program on any syntactic diagnostic, so that
+  one fence was silencing eleven diagnostics in as-zip's other blocks.
+- ⚠️ **`as-zip`'s AES interop claim is narrowed to what is now proven.** 7-Zip
+  prompts for the password on Linux, macOS and Windows. **Some distro-packaged
+  `unar` builds cannot read these archives** — measured on `ubuntu-latest`,
+  2026-09-05, CI run 33944815086, every vector failing with "Missing or wrong
+  password". macOS's `unar` reads the identical bytes, as does 7-Zip everywhere,
+  so the limit is in that build rather than in the archive; but a recipient
+  reaching for their distro's `unar` may not get in. The run id is in the
+  sentence deliberately, so the claim stays checkable as runner images move. The
+  `password` JSDoc said the opposite — that nothing had been validated — and now
+  agrees with the README.
 
 ### Repository (not published)
 
-- Version tooling, which the extraction never carried across. `pnpm version:set
-  <version>` moves all ten packages and the internal `as-xlsx -> as-zip` range
-  in one edit, delegating ordering to `semver` rather than to a hand-rolled
-  comparator. `check:versions-uniform` holds the line uniform in CI;
-  `check:not-already-published` gates the release on what npm actually carries.
-- The release workflow's version-vs-tag gate read the root manifest's `version`,
-  which does not exist here — the root is `private: true`. It compared the
-  string `"undefined"` against the tag and would have failed every release. It
-  now checks the ten package manifests.
-- The npm auth pre-flight in the publish job is now **fatal**. It was
-  `continue-on-error: true` and its `||` branch swallowed the exit status, so it
-  could not have failed by either route — it printed the right answer and was
-  wired to nothing. npm reports write-path auth failures as 404, so a bad token
-  previously sailed past it and surfaced on publish as "not in this registry",
-  which reads as a missing package rather than an auth problem.
-- The `docs-bridge` job is **removed**. It referenced two files this repo does
-  not have and was `continue-on-error` at the job level, so every release would
-  have died at "Build payload" while the run still reported green — producing
-  neither half of the documented proof pair. Porting it is not a copy: the
-  payload builder filters on a `to-` prefix by design, so run here it emits zero
-  packages and the job's own guard fails. Decided at the coordination layer for
-  all three extracted repos: file the doc-sync issue directly from the workflow
-  instead, since noy-db-docs' pin check reads the issue body rather than the
-  Release body. Not yet wired — it needs noy-db-docs' agreement and a token
-  scoped to their repo, and until then no job is the honest state.
+- **`pnpm check:prose-examples`** compiles every fenced `ts` block in every
+  shipped README against that package's built `dist`. noy-db's equivalent scans
+  `packages/*/README.md` in noy-db; these READMEs left that scope at the
+  extraction and nothing replaced it, while `files` ships all ten. It refuses to
+  run against an unbuilt package rather than resolving every import to `any`,
+  and reports a syntactic diagnostic as poisoning the package rather than as
+  ordinary findings.
+- **A blocking three-OS interop job** for `as-zip`, replacing noy-db's dropped
+  copy (noy-db #1331). `NOYDB_INTEROP_REQUIRE` names the tools that must be
+  present, so a missing one fails instead of skipping quietly; `publish` depends
+  on the job.
+- CI's `pull_request` trigger no longer filters on the base branch, which had
+  been skipping every stacked PR while `peer-floor` still ran — showing some
+  green checks and no CI.
+- Version tooling the extraction never carried across: `pnpm version:set`,
+  `check:versions-uniform`, `check:not-already-published`.
+- **The doc-sync payload.** Every release now uploads a `docs-bridge.json`
+  asset that noy-db-docs' range walk reads, replacing the hand-read issue
+  (lanna-db#17). The package set is derived from the top-level `as-*/`
+  directories rather than a table — two noy-db-to releases shipped a broken
+  payload because a new store was missing from a hard-coded one, and both runs
+  reported success. Lockstep is asserted rather than assumed, and the upload job
+  is deliberately not `continue-on-error`: from the moment docs makes this repo
+  a partition source, a release with no asset stops the entire sync run for
+  every partition, not just ours.
+- Ported scripts and workflows corrected against this tree rather than
+  noy-db-to's, including a `release.yml` version gate that compared the string
+  `"undefined"` to the tag and would have failed every release.
 
 ## 0.7.0
 

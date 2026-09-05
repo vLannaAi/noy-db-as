@@ -23,9 +23,14 @@ const archive = await toBytes(vault, {
 })
 ```
 
-The output is still a valid single-disk ZIP that archive tools
-recognising WinZip-AES (7-Zip, Archive Utility, WinRAR, modern
-unzip builds) prompt for the password on extract. Read back via:
+The output is still a valid single-disk ZIP. 7-Zip prompts for the
+password on extract, verified on Linux, macOS and Windows.
+
+⚠️ **Known exception:** `unar` as shipped by Ubuntu (checked
+2026-09-05) fails with *"Missing or wrong password"* on these
+archives. A newer `unar` (Homebrew) reads them fine, as does 7-Zip
+on every platform, so this is a limitation of that build rather
+than of the archive. Read back via:
 
 ```ts
 import { fromBytes } from '@noy-db/as-zip'
@@ -42,8 +47,11 @@ await decoded.apply()
 > AES-256 only. ZipCrypto and AES-128/192 are refused at both write
 > and read time.
 >
-> Validated against 7-Zip 26.x (Linux/macOS/Windows) and Archive
-> Utility (macOS 15) — see [`docs/interop-matrix.md`](../../docs/interop-matrix.md).
+> Validated on every push that touches this package, against 7-Zip
+> on ubuntu / macos / windows runners and `unar` on macOS — see
+> [`.github/workflows/interop.yml`](../.github/workflows/interop.yml).
+> The job is blocking and `publish` depends on it, so a release
+> cannot ship past a failing vector.
 >
 > **This is the interop layer**, not the encryption layer. For
 > multi-recipient + revocable + audited noy-db egress, use

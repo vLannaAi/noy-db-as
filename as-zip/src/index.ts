@@ -98,11 +98,16 @@ export interface AsZipOptions<T = unknown> {
    * encrypted with WinZip-AES-256 and the recipient must supply the
    * secret to extract.
    *
-   * **Interop note:** the implementation is strictly to spec but has
-   * not been validated against 7-Zip / Archive Utility / WinRAR in
-   * this checkout. Round-trips against the package's own reader pass.
-   * See https://github.com/vLannaAi/noy-db/issues/304 for the
-   * cross-tool validation matrix.
+   * **Interop note:** validated against 7-Zip on Linux, macOS and
+   * Windows, and against `unar` on macOS, by a blocking CI job that
+   * `publish` depends on.
+   *
+   * ⚠️ `unar` as shipped by Ubuntu (checked 2026-09-05) CANNOT read
+   * these archives — it reports "Missing or wrong password". The
+   * identical bytes open under a newer `unar` and under 7-Zip on
+   * every platform, so this is that build's limitation rather than
+   * the archive's, but a recipient on Ubuntu reaching for their
+   * distro's tool will not get in.
    *
    * **Security framing:** this is the *interop* layer for
    * cross-platform handoff to archive tools, not the *encryption*

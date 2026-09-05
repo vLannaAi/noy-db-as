@@ -42,14 +42,15 @@ Absent the grant → `ExportCapabilityError`.
 ```ts
 import { toBytes } from '@noy-db/as-xlsx'
 
-const bytes = await toBytes(vault, {
+interface Invoice { id: string; status: string }
+
+const bytes = await toBytes<Invoice>(vault, {
   sheets: [
     {
       name: 'Invoices',
       collection: 'invoices',
       columns: ['id', 'client', 'amount', 'status', 'issueDate'],
-      // `filter` receives `unknown` — narrow it yourself:
-      filter: (r) => (r as { status: string }).status !== 'draft',
+      filter: (r) => r.status !== 'draft',
     },
     { name: 'Payments', collection: 'payments' },
   ],

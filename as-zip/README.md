@@ -86,11 +86,12 @@ await db.grant('firm', {
 ```ts
 import { toBytes } from '@noy-db/as-zip'
 
-const bytes = await toBytes(vault, {
+interface Invoice { id: string; status: string }
+
+const bytes = await toBytes<Invoice>(vault, {
   records: {
     collection: 'invoices',
-    // `filter` receives `unknown` — narrow it yourself:
-    filter: (r) => (r as { status: string }).status === 'paid', // optional
+    filter: (r) => r.status === 'paid', // optional
   },
   attachments: {
     slots: ['raw', 'thumb'], // optional; default '*' = every slot

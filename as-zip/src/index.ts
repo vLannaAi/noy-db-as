@@ -60,8 +60,14 @@ export { writeZip, crc32, type ZipEntry, type WriteZipOptions } from './zip.js'
 export { readZip, type ReadZipEntry, type ReadZipOptions, ZipReadError } from './read.js'
 export { ZipCipherError } from './aes.js'
 
-/** Record-selection options. */
-export interface AsZipRecordsOptions {
+/**
+ * Record-selection options.
+ *
+ * `T` is the shape of a decrypted record in this collection. It defaults to
+ * `unknown`, so every existing call keeps compiling unchanged; supply it (or
+ * annotate `filter`'s parameter) when you want the predicate typed.
+ */
+export interface AsZipRecordsOptions<T = unknown> {
   /** Collection to export. Must be in the caller's read ACL. */
   readonly collection: string
   /**
@@ -69,7 +75,7 @@ export interface AsZipRecordsOptions {
    * every record is included. Runs after decryption, before zip
    * assembly — doesn't reduce I/O, just the final set.
    */
-  readonly filter?: (record: unknown) => boolean
+  readonly filter?: (record: T) => boolean
 }
 
 /** Blob-selection options. */
@@ -83,8 +89,8 @@ export interface AsZipAttachmentsOptions {
 }
 
 /** Top-level options for every entry point. */
-export interface AsZipOptions {
-  readonly records: AsZipRecordsOptions
+export interface AsZipOptions<T = unknown> {
+  readonly records: AsZipRecordsOptions<T>
   readonly attachments?: AsZipAttachmentsOptions
   /**
    * Optional WinZip-AES-256 secret. When set, every entry
@@ -107,13 +113,13 @@ export interface AsZipOptions {
 }
 
 /** Options for `download()` — adds an optional filename. */
-export interface AsZipDownloadOptions extends AsZipOptions {
+export interface AsZipDownloadOptions<T = unknown> extends AsZipOptions<T> {
   /** Filename offered to the browser. Default `'<collection>.zip'`. */
   readonly filename?: string
 }
 
 /** Options for `write()` — requires explicit risk acknowledgement. */
-export interface AsZipWriteOptions extends AsZipOptions {
+export interface AsZipWriteOptions<T = unknown> extends AsZipOptions<T> {
   /**
    * Required for Node file-write calls — consumer acknowledgement
    * that plaintext bytes will persist on disk past the current
@@ -150,7 +156,7 @@ export interface ArchiveManifest {
  * at the archive root so extractors can walk the content without
  * re-reading every file.
  */
-export async function toBytes(vault: Vault, options: AsZipOptions): Promise<Uint8Array> {
+export async function toBytes<T = unknown>(vault: Vault, options: AsZipOptions<T>): Promise<Uint8Array> {
   vault.assertCanExport('plaintext', 'zip')
 
   const collectionName = options.records.collection
@@ -163,7 +169,11 @@ export async function toBytes(vault: Vault, options: AsZipOptions): Promise<Uint
   for (const id of ids) {
     const r = await collection.get(id)
     if (r === null) continue
-    if (options.records.filter && !options.records.filter(r)) continue
+    // `r` is the decrypted record as it exists at runtime: a plain object.
+    // `T` is the caller's assertion about that shape, unverifiable here — the
+    // same contract `vault.collection<T>()` already makes. The cast is where
+    // that assertion is taken on trust, and it is the only one.
+    if (options.records.filter && !options.records.filter(r as T)) continue
     records.push({ id, record: r })
   }
 
@@ -247,7 +257,7 @@ export async function toBytes(vault: Vault, options: AsZipOptions): Promise<Uint
  * browser's download prompt. Requires `URL.createObjectURL` +
  * `document.createElement`. Throws in headless Node.
  */
-export async function download(vault: Vault, options: AsZipDownloadOptions): Promise<void> {
+export async function download<T = unknown>(vault: Vault, options: AsZipDownloadOptions<T>): Promise<void> {
   const bytes = await toBytes(vault, options)
   const filename = options.filename ?? `${options.records.collection}.zip`
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -265,10 +275,10 @@ export async function download(vault: Vault, options: AsZipDownloadOptions): Pro
  * explicit `acknowledgeRisks: true` (Tier 3 egress — the archive
  * contains plaintext records + blob bytes).
  */
-export async function write(
+export async function write<T = unknown>(
   vault: Vault,
   path: string,
-  options: AsZipWriteOptions,
+  options: AsZipWriteOptions<T>,
 ): Promise<void> {
   if (options.acknowledgeRisks !== true) {
     throw new Error(
